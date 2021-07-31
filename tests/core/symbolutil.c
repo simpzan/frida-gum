@@ -6,6 +6,7 @@
  */
 
 #include "testutil.h"
+#include "symbolutilcxx.h"
 
 #define TESTCASE(NAME) \
     void test_symbolutil_ ## NAME (void)
@@ -42,6 +43,18 @@ TESTCASE (symbol_details_from_address)
   assert_basename_equals (__FILE__, details.file_name);
   g_assert_cmpuint (details.line_number, >, 0);
 #endif
+
+  void *cppFunctionAddr = getCppFunctionAddress();
+  g_assert_true (gum_symbol_details_from_address (cppFunctionAddr, &details));
+  g_assert_cmphex (GPOINTER_TO_SIZE (details.address), ==,
+      GPOINTER_TO_SIZE (cppFunctionAddr));
+  g_assert_true (g_str_has_prefix (details.module_name, "gum-tests"));
+  g_assert_true (g_strrstr (details.symbol_name, getCppFunctionName()));
+#ifndef HAVE_IOS
+  assert_basename_equals (getCppFunctionFilename(), details.file_name);
+  g_assert_cmpuint (details.line_number, ==, getCppFunctionLineNumber());
+#endif
+
 #ifdef HAVE_LINUX
   g_assert_true (gum_symbol_details_from_address (&gum_dummy_variable,
       &details));

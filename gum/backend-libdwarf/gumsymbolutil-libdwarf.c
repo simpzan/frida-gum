@@ -137,6 +137,8 @@ static gboolean gum_enumerate_dies_recurse (Dwarf_Debug dbg, Dwarf_Die die,
 
 static gboolean gum_read_die_name (Dwarf_Debug dbg, Dwarf_Die die,
     gchar ** name);
+static gboolean gum_read_die_linkage_name (Dwarf_Debug dbg,
+    Dwarf_Off offset, gchar ** name);
 static gboolean gum_read_attribute_location (Dwarf_Debug dbg, Dwarf_Die die,
     Dwarf_Half id, Dwarf_Addr * address);
 static gboolean gum_read_attribute_address (Dwarf_Debug dbg, Dwarf_Die die,
@@ -857,6 +859,12 @@ gum_collect_die_if_closest_so_far (const GumDieDetails * details,
     g_clear_pointer (&symbol->name, g_free);
     gum_read_die_name (dbg, die, &symbol->name);
 
+    Dwarf_Off offset;
+    if (symbol->name == NULL && gum_read_attribute_offset (dbg, die, DW_AT_specification, &offset))
+    {
+      gum_read_die_linkage_name(dbg, offset, &symbol->name);
+    }
+
     if (gum_read_attribute_uint (dbg, die, DW_AT_decl_line, &line_number))
     {
       symbol->line_number = line_number;
@@ -1031,6 +1039,29 @@ gum_read_die_name (Dwarf_Debug dbg,
 
   dwarf_dealloc (dbg, str, DW_DLA_STRING);
 
+  return TRUE;
+}
+
+static gboolean
+gum_read_die_linkage_name (Dwarf_Debug dbg,
+                           Dwarf_Off offset,
+                           gchar ** name)
+{
+  Dwarf_Die die;
+  Dwarf_Error err;
+  int res = dwarf_offdie(dbg, offset, &die, &err);
+  if (res != 0)
+    return FALSE;
+
+  char *str = NULL;
+  res = dwarf_die_text(die, DW_AT_linkage_name, &str, &err);
+  if (res != 0)
+    return FALSE;
+
+  if (name)
+    *name = g_strdup (str);
+
+  dwarf_dealloc (dbg, str, DW_DLA_STRING);
   return TRUE;
 }
 

@@ -4,6 +4,7 @@ core_sources = [
   'memory.c',
   'process.c',
   'symbolutil.c',
+  'symbolutilcxx.cpp',
   'apiresolver.c',
   'backtracer.c',
   'interceptor.c',
