@@ -28,6 +28,7 @@ typedef struct _GumModuleEntry GumModuleEntry;
 
 typedef struct _GumNearestSymbolDetails GumNearestSymbolDetails;
 typedef struct _GumDwarfSymbolDetails GumDwarfSymbolDetails;
+typedef struct _GumDwarfDebugSymbolDetails GumDwarfDebugSymbolDetails;
 typedef struct _GumDwarfSourceDetails GumDwarfSourceDetails;
 typedef struct _GumFindCuDieOperation GumFindCuDieOperation;
 typedef struct _GumFindSymbolOperation GumFindSymbolOperation;
@@ -62,6 +63,14 @@ struct _GumDwarfSymbolDetails
 struct _GumDwarfSourceDetails
 {
   gchar * path;
+  guint line_number;
+};
+
+struct _GumDwarfDebugSymbolDetails {
+  gpointer address;
+  gchar * name;
+  gchar * path;
+  guint path_index;
   guint line_number;
 };
 
@@ -137,8 +146,6 @@ static gboolean gum_enumerate_dies_recurse (Dwarf_Debug dbg, Dwarf_Die die,
 
 static gboolean gum_read_die_name (Dwarf_Debug dbg, Dwarf_Die die,
     gchar ** name);
-static gboolean gum_read_die_linkage_name (Dwarf_Debug dbg,
-    Dwarf_Off offset, gchar ** name);
 static gboolean gum_read_attribute_location (Dwarf_Debug dbg, Dwarf_Die die,
     Dwarf_Half id, Dwarf_Addr * address);
 static gboolean gum_read_attribute_address (Dwarf_Debug dbg, Dwarf_Die die,
@@ -154,7 +161,147 @@ G_LOCK_DEFINE_STATIC (gum_symbol_util);
 static GHashTable * gum_module_entries = NULL;
 static GHashTable * gum_function_addresses = NULL;
 static GHashTable * gum_address_symbols = NULL;
+static GHashTable * gum_address_to_symbols = NULL;
 static GTimer * gum_cache_timer = NULL;
+
+
+#include <gumlog.h>
+
+static gboolean
+gum_read_attribute_text (Dwarf_Debug dbg,
+                       Dwarf_Die die,
+                       Dwarf_Half id,
+                       gchar ** name)
+{
+  char *str = NULL;
+  Dwarf_Error err;
+  int res = dwarf_die_text(die, id, &str, &err);
+  if (res != 0) return FALSE;
+
+  if (name) *name = g_strdup (str);
+
+  dwarf_dealloc (dbg, str, DW_DLA_STRING);
+  return TRUE;
+}
+
+Dwarf_Die gum_read_die_at(Dwarf_Debug dbg,
+                          Dwarf_Die die,
+                          Dwarf_Half id)
+{
+  Dwarf_Off offset;
+  gboolean res = gum_read_attribute_offset (dbg, die, id, &offset);
+  if (!res) return NULL;
+
+  Dwarf_Die die_linked = NULL;
+  Dwarf_Error err;
+  res = dwarf_offdie(dbg, offset, &die_linked, &err);
+  if (res != 0) return NULL;
+  return die_linked;
+}
+
+static void
+gum_read_die_info(
+  Dwarf_Debug dbg,
+  Dwarf_Die die,
+  GumDwarfDebugSymbolDetails *details
+) {
+  if (!details->name) gum_read_attribute_text(dbg, die, DW_AT_linkage_name, &details->name);
+  if (!details->name) gum_read_attribute_text(dbg, die, DW_AT_name, &details->name);
+
+  Dwarf_Unsigned line_number = 0;
+  if (details->line_number == 0 && gum_read_attribute_uint (dbg, die, DW_AT_decl_line, &line_number))
+  {
+    details->line_number = line_number;
+  }
+
+  Dwarf_Unsigned path_index = 0;
+  if (details->path_index == 0 && gum_read_attribute_uint(dbg, die, DW_AT_decl_file, &path_index)) {
+    details->path_index = path_index;
+  }
+}
+
+static gboolean
+gum_read_die_name_recursively (Dwarf_Debug dbg,
+                           Dwarf_Die die,
+                           gchar ** name)
+{
+  gboolean ok = gum_read_attribute_text(dbg, die, DW_AT_linkage_name, name);
+  if (ok) return TRUE;
+
+  ok = gum_read_attribute_text(dbg, die, DW_AT_name, name);
+  if (ok) return TRUE;
+
+  Dwarf_Die die_specification = gum_read_die_at(dbg, die, DW_AT_specification);
+  if (die_specification) {
+    gum_read_die_name_recursively(dbg, die_specification, name);
+    dwarf_dealloc (dbg, die_specification, DW_DLA_DIE);
+  }
+
+  Dwarf_Die die_abstract_origin = gum_read_die_at(dbg, die, DW_AT_abstract_origin);
+  if (die_abstract_origin) {
+    gum_read_die_name_recursively(dbg, die_abstract_origin, name);
+    dwarf_dealloc (dbg, die_abstract_origin, DW_DLA_DIE);
+  }
+  return FALSE;
+}
+
+static gboolean gum_collect_fn (const GumDieDetails * details,
+                                   GumFindSymbolOperation * op)
+{
+  Dwarf_Debug dbg = details->dbg;
+  Dwarf_Die die = details->die;
+
+  Dwarf_Half tag;
+  if (dwarf_tag (die, &tag, NULL) != DW_DLV_OK)
+    return TRUE;
+
+  if (tag != DW_TAG_subprogram) return TRUE;
+
+  Dwarf_Addr address;
+  if (!gum_read_attribute_address (dbg, die, DW_AT_low_pc, &address))
+    return TRUE;
+
+  GumDwarfDebugSymbolDetails symbol = {0};
+  symbol.address = address;
+  gum_read_die_info(dbg, die, &symbol);
+  
+  Dwarf_Die die_specification = gum_read_die_at(dbg, die, DW_AT_specification);
+  if (die_specification) {
+    gum_read_die_info(dbg, die_specification, &symbol);
+    dwarf_dealloc (dbg, die_specification, DW_DLA_DIE);
+  }
+
+  Dwarf_Die die_abstract_origin = gum_read_die_at(dbg, die, DW_AT_abstract_origin);
+  if (die_abstract_origin) {
+    gum_read_die_info(dbg, die_abstract_origin, &symbol);
+    dwarf_dealloc (dbg, die_abstract_origin, DW_DLA_DIE);
+  }
+
+  char **files = (char **)op;
+  INFO("%p %s:%d %s", (void *)address, basename(files[symbol.path_index - 1]), symbol.line_number, symbol.name);
+
+  return TRUE;
+}
+void gum_cache_symbols(Dwarf_Debug dbg,
+                       Dwarf_Die cu_die) {
+  char ** files = NULL;
+  Dwarf_Signed count = 0;
+  Dwarf_Error error;
+  int ok = dwarf_srcfiles(cu_die, &files, &count, &error);
+  if (ok != DW_DLV_OK) return;
+
+  gum_enumerate_dies (dbg, cu_die,
+      (GumFoundDieFunc) gum_collect_fn, files);
+
+  for (int i=0; i<count; ++i) {
+    char *file = files[i];
+    // INFO("%d/%d %s", i+1, (int)count, file);
+    dwarf_dealloc(dbg, file, DW_DLA_STRING);
+  }
+  dwarf_dealloc(dbg, files, DW_DLA_LIST);
+  files = NULL;
+}
+
 
 gboolean
 gum_symbol_details_from_address (gpointer address,
@@ -184,6 +331,7 @@ gum_symbol_details_from_address (gpointer address,
   if (cu_die == NULL)
     goto cu_die_not_found;
 
+  gum_cache_symbols(entry->dbg, cu_die);
   if (!gum_find_symbol_by_virtual_address (entry->dbg, cu_die, file_address,
       &symbol))
     goto symbol_not_found;
@@ -202,6 +350,7 @@ gum_symbol_details_from_address (gpointer address,
   details->line_number = source.line_number;
 
   success = TRUE;
+  INFO("%p %s:%d %s", (void *)file_address, source.path, (int)source.line_number, symbol.name);
 
   g_free (source.path);
 
@@ -710,6 +859,8 @@ gum_symbol_util_ensure_initialized (void)
       g_free, (GDestroyNotify) gum_function_addresses_free);
   gum_address_symbols = g_hash_table_new_full (g_direct_hash, g_direct_equal,
       NULL, (GDestroyNotify) gum_address_symbols_value_free);
+  gum_address_to_symbols = g_hash_table_new_full (g_direct_hash, g_direct_equal,
+      NULL, (GDestroyNotify) NULL); // todo: free memory
 
   _gum_register_destructor (gum_symbol_util_deinitialize);
 }
@@ -859,10 +1010,9 @@ gum_collect_die_if_closest_so_far (const GumDieDetails * details,
     g_clear_pointer (&symbol->name, g_free);
     gum_read_die_name (dbg, die, &symbol->name);
 
-    Dwarf_Off offset;
-    if (symbol->name == NULL && gum_read_attribute_offset (dbg, die, DW_AT_specification, &offset))
+    if (symbol->name == NULL)
     {
-      gum_read_die_linkage_name(dbg, offset, &symbol->name);
+      gum_read_die_name_recursively(dbg, die, &symbol->name);
     }
 
     if (gum_read_attribute_uint (dbg, die, DW_AT_decl_line, &line_number))
@@ -889,6 +1039,21 @@ gum_find_line_by_virtual_address (Dwarf_Debug dbg,
     return FALSE;
 
   success = FALSE;
+  // INFO("line_count %d", (int)line_count);
+  // for (line_index = 0; line_index != line_count; line_index++)
+  // {
+  //   Dwarf_Line line = lines[line_index];
+  //   Dwarf_Unsigned line_number;
+  //   if (dwarf_lineno (line, &line_number, NULL) != DW_DLV_OK)
+  //     continue;
+
+  //   char * path;
+  //   if (dwarf_linesrc (line, &path, NULL) != DW_DLV_OK)
+  //     continue;
+  //   INFO("path %s:%d, %d", path, (int)line_number, (int)line_index);
+  //   dwarf_dealloc (dbg, path, DW_DLA_STRING);
+  // }
+
 
   for (line_index = 0; line_index != line_count; line_index++)
   {
@@ -1039,29 +1204,6 @@ gum_read_die_name (Dwarf_Debug dbg,
 
   dwarf_dealloc (dbg, str, DW_DLA_STRING);
 
-  return TRUE;
-}
-
-static gboolean
-gum_read_die_linkage_name (Dwarf_Debug dbg,
-                           Dwarf_Off offset,
-                           gchar ** name)
-{
-  Dwarf_Die die;
-  Dwarf_Error err;
-  int res = dwarf_offdie(dbg, offset, &die, &err);
-  if (res != 0)
-    return FALSE;
-
-  char *str = NULL;
-  res = dwarf_die_text(die, DW_AT_linkage_name, &str, &err);
-  if (res != 0)
-    return FALSE;
-
-  if (name)
-    *name = g_strdup (str);
-
-  dwarf_dealloc (dbg, str, DW_DLA_STRING);
   return TRUE;
 }
 
