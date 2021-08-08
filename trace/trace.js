@@ -5,7 +5,6 @@ const CppDemangler = require('./CppDemangler.node');
 log("cwd", process.cwd())
 const frida = require('../../build/frida_thin-linux-x86_64/lib/node_modules/frida');
 
-let functions = [];
 let events = [];
 function onMessageFromDebuggee(msg, bytes) {
     const payload = msg.payload;
@@ -17,7 +16,7 @@ function onMessageFromDebuggee(msg, bytes) {
             let ts = bytes.readBigInt64LE(i); i += 8;
             const ph = ts > 0 ? 'B' : 'E';
             ts = ts > 0 ? ts : -ts;
-            ts = '0x' + ts.toString(16);
+            ts = ts.toString(10);
             const event = { ph, tid, pid, addr, ts };
             events.push(event);
             log.i(event);
@@ -25,18 +24,6 @@ function onMessageFromDebuggee(msg, bytes) {
     } else {
         log.e(`unkown msg`, ...arguments);
     }
-}
-
-async function demangleFunctionNames() {
-    log.i(`demangle function names`);
-    const functionMap = new Map()
-    const demangler = new CppDemangler();
-    for (const fn of functions) {
-        fn.demangledName = await demangler.demangle(fn.name);
-        functionMap.set(fn.address, fn);
-    }
-    demangler.exit();
-    return functionMap;
 }
 
 class ChromeTracingFile {
@@ -91,6 +78,29 @@ function isRunning(program) {
     return out && out.length;
 }
 
+async function getFunctionsToTrace(rpc, libName) {
+    const module = await rpc.getModuleByName(libName);
+    const baseAddr = parseInt(module.base, 16);
+    const srclineReader = new CppDemangler.SourceLineFinder(module.path);
+    const demangler = new CppDemangler();
+    let functions = await rpc.getFunctionsOfModule(libName);
+
+    const functionsToTrace = new Map()
+    for (const fn of functions) {
+        const addr = parseInt(fn.address, 16) - baseAddr;
+        const addr2 = '0x' + addr.toString(16);
+        const srcline = srclineReader.srcline(addr2);
+        if (!srcline || srcline.includes('/include/c++/')) continue;
+        fn.demangledName = await demangler.demangle(fn.name);
+        // log.d(addr2, (srcline), '\t\t', fn.demangledName);
+
+        functionsToTrace.set(fn.address, fn);
+    }
+    demangler.exit();
+
+    return functionsToTrace;
+}
+
 async function main() {
     const argv = process.argv;
     log.i("argv", argv);
@@ -106,12 +116,8 @@ async function main() {
 
     const script = await attachProcess(processName, sourceFilename);
 
-    functions = await script.exports.getFunctionsOfModule(libName);
-    let functionsToTrace = functions.filter(fn => fn.size > 4);
-    functions = functionsToTrace;
-    log.i(functionsToTrace);
-    functionsToTrace = functionsToTrace.map(fn => fn.address);
-    await script.exports.startTracing(functionsToTrace);
+    const functionsToTrace = await getFunctionsToTrace(script.exports, libName);
+    await script.exports.startTracing([...functionsToTrace.keys()]);
 
     if (pid) await frida.resume(pid);
 
@@ -128,8 +134,7 @@ async function main() {
 
     if (!events.length) return log.i('no trace data.');
 
-    const functionMap = await demangleFunctionNames();
-    writeChromeTracingFile(`${libName}.json`, functionMap);
+    writeChromeTracingFile(`${libName}.json`, functionsToTrace);
     log.i('tracing done!');
 };
 main();

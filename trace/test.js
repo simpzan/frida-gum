@@ -53,6 +53,9 @@ class Tracer {
 const tracer = new Tracer();
 
 rpc.exports = {
+    getModuleByName(libName) {
+        return Process.getModuleByName(libName);
+    },
     getFunctionsOfModule(libName) {
         const module = Process.getModuleByName(libName);
         let functions = module.enumerateSymbols();
