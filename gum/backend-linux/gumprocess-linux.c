@@ -1936,7 +1936,7 @@ gum_resolve_module_name (const gchar * name,
   {
     ctx.name = g_file_read_link (map->l_name, NULL);
     if (ctx.name == NULL)
-      ctx.name = g_strdup (map->l_name);
+      ctx.name = g_strdup (basename(map->l_name));
     dlclose (map);
   }
   else
