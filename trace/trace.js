@@ -8,7 +8,7 @@ const frida = require('../../build/frida_thin-linux-x86_64/lib/node_modules/frid
 let events = [];
 function onMessageFromDebuggee(msg, bytes) {
     const payload = msg.payload;
-    if (!payload) return log.e(...msg);
+    if (!payload) return log.e(...arguments);
     if (payload.type === 'events') {
         const { pid, tid } = msg.payload;
         for (let i = 0; i < bytes.length; ) {

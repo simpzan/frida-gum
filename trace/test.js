@@ -7,17 +7,25 @@ function log() {
 }
 const pid = Process.id;
 
+function getNativeFunction(module, name, argumentTypes = [], returnType = 'void') {
+    const ptr = module.getExportByName(name);
+    const fn = new NativeFunction(ptr, returnType, argumentTypes);
+    return fn;
+}
+
 function loadLibTrace(path, callback) {
     const module = Module.load(path);
     const sendDataFn = module.getExportByName('_sendDataFn');
     const sendData = new NativeCallback(callback, 'void', ['pointer', 'int', 'int']);
     log(`sendData ${sendData}`);
     sendDataFn.writePointer(sendData);
+    const flushAll = getNativeFunction(module, 'flushAll');
 
     const attachCallbacks = {
         onEnter: module.getExportByName('onEnter'),
         onLeave: module.getExportByName('onLeave'),
-        sendData
+        sendData,
+        flushAll
     };
     return attachCallbacks;
 }
@@ -25,8 +33,8 @@ const onTraceEvent = function(bytes, length, tid) {
     // const fn = bytes.readU64();
     // bytes = bytes.add(8);
     // const ts = bytes.readS64();
-    log(`event from tid ${tid}, ${length} bytes`);
     const data = bytes.readByteArray(length);
+    log(`event from tid ${tid}, ${data.length} bytes`);
     send({ type:'events', tid, pid }, data);
 }
 
@@ -40,12 +48,10 @@ class Tracer {
             const addr = new NativePointer(fn);
             Interceptor.attach(addr, this.attachCallbacks, addr);
         }
-        const addr = Module.getExportByName(null, 'printText');
-        log(addr, functionAddresses);
-        // Interceptor.attach(addr, this.attachCallbacks, addr);
     }
     exit() {
         Interceptor.detachAll();
+        this.attachCallbacks.flushAll();
         this.attachCallbacks = null;
         //todo: flush events from native side.
     }
