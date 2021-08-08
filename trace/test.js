@@ -34,7 +34,7 @@ const onTraceEvent = function(bytes, length, tid) {
     // bytes = bytes.add(8);
     // const ts = bytes.readS64();
     const data = bytes.readByteArray(length);
-    log(`event from tid ${tid}, ${data.length} bytes`);
+    log(`event from tid ${tid}, ${length} bytes`);
     send({ type:'events', tid, pid }, data);
 }
 

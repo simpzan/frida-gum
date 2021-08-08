@@ -5,12 +5,19 @@ const CppDemangler = require('./CppDemangler.node');
 log("cwd", process.cwd())
 const frida = require('../../build/frida_thin-linux-x86_64/lib/node_modules/frida');
 
+let threadNames = new Map();
 let events = [];
 function onMessageFromDebuggee(msg, bytes) {
     const payload = msg.payload;
     if (!payload) return log.e(...arguments);
     if (payload.type === 'events') {
         const { pid, tid } = msg.payload;
+        if (tid < 0) {
+            const name = bytes.toString('utf8').trim();
+            const id = -tid;
+            threadNames.set(id, name);
+            return log.i(`thread ${id} ${name}`);
+        }
         for (let i = 0; i < bytes.length; ) {
             const addr = '0x' + bytes.readBigUInt64LE(i).toString(16); i += 8;
             let ts = bytes.readBigInt64LE(i); i += 8;
@@ -43,15 +50,12 @@ class ChromeTracingFile {
 function writeChromeTracingFile(filename, functionMap) {
     log.i(`writing chrome tracing file ${filename}`);
     const traceFile = new ChromeTracingFile(filename);
-    const tids = new Set();
     for (const trace of events) {
-        tids.add(trace.tid);
         const fn = functionMap.get(trace.addr);
         trace.name = fn.demangledName || fn.name;
         traceFile.writeObject(trace);
     }
     const pid = events[0].pid;
-    const threadNames = utils.getThreadNames(pid, Array.from(tids));
     for (const [tid, threadName] of threadNames) {
         const name = `${threadName}/${tid}`;
         const entry = {"ts":0, "ph":"M", "name":"thread_name", pid, tid, "args":{name}};
