@@ -360,6 +360,7 @@ subdir('libs')
 subdir('bindings')
 subdir('vapi')
 subdir('tools')
+subdir('trace')
 
 if get_option('tests')
   subdir('tests')
