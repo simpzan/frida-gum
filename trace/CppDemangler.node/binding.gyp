@@ -10,7 +10,18 @@
         "<!(pwd)/libelfin/dwarf/libdwarf++.a",
         "<!(pwd)/libelfin/elf/libelf++.a"
       ],
-      "cflags_cc": [ "-fexceptions" ]
+      'conditions': [
+        ['OS=="linux"', {
+          "cflags_cc": [ "-fexceptions" ]
+        }],
+        ['OS=="mac"', {
+          'xcode_settings': {
+            'GCC_ENABLE_CPP_EXCEPTIONS': 'YES',
+            'OTHER_CFLAGS': [ '-ObjC++' ]
+          },
+          'libraries': [ '-lobjc' ],
+        }]
+      ]
     }
   ]
 }
