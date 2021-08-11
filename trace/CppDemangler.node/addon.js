@@ -33,8 +33,10 @@ function testInteractively() {
     console.log(input2, output2);
 }
 function test() {
-    const reader = new SourceLineFinder("/home/simpzan/frida/cpp-example/libtest.so");
-    const inputs = ['0xc530', '0x1234'];
+    console.log(process.argv)
+    const soFile = process.argv[2]
+    const reader = new SourceLineFinder(soFile);
+    const inputs = process.argv.slice(3);
     for (const input of inputs) {
         const output = reader.srcline(input);
         console.log(`${input} -> ${output}`);
