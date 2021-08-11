@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <inttypes.h>
 #include <memory>
+#include <iostream>
 #include <string>
 #include <node.h>
 #include <cxxabi.h>
@@ -126,8 +127,13 @@ void srcline(const FunctionCallbackInfo<Value> &args) {
     return;
   }
 
-  v8::String::Utf8Value str1(isolate, args[0]);
-  std::string res = srclineReader.srcline(*str1);
+  std::string res;
+  try {
+    v8::String::Utf8Value str1(isolate, args[0]);
+    res = srclineReader.srcline(*str1);
+  } catch(const std::exception& e) {
+    std::cerr << e.what() << '\n';
+  }
 
   args.GetReturnValue().Set(
       String::NewFromUtf8(isolate, res.c_str()).ToLocalChecked());
