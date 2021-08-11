@@ -46,7 +46,11 @@ class Tracer {
     traceFunctions(functionAddresses) {
         for (const fn of functionAddresses) {
             const addr = new NativePointer(fn);
-            Interceptor.attach(addr, this.attachCallbacks, addr);
+            try {
+                Interceptor.attach(addr, this.attachCallbacks, addr);
+            } catch (error) {
+                log(`attach failed, ${error}. ${DebugSymbol.fromAddress(addr)}`);
+            }
         }
     }
     exit() {
