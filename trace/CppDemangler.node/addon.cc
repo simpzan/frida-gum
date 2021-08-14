@@ -9,6 +9,7 @@
 #include <string>
 #include <node.h>
 #include <cxxabi.h>
+#include "log.h"
 
 using namespace v8;
 using namespace std;
@@ -69,6 +70,46 @@ void demangle(const FunctionCallbackInfo<Value> &args) {
 }
 
 
+bool find_pc(const dwarf::die &d, dwarf::taddr pc, vector<dwarf::die> *stack) {
+  using namespace dwarf;
+
+  // Scan children first to find most specific DIE
+  bool found = false;
+  for (auto &child : d) {
+          if ((found = find_pc(child, pc, stack)))
+                  break;
+  }
+  switch (d.tag) {
+  case DW_TAG::subprogram:
+  // case DW_TAG::inlined_subroutine:
+          try {
+                  if (found || die_pc_range(d).contains(pc)) {
+                          found = true;
+                          stack->push_back(d);
+                  }
+          } catch (out_of_range &e) {
+          } catch (value_type_mismatch &e) {
+          }
+          break;
+  default:
+          break;
+  }
+  return found;
+}
+
+void dump_die(const dwarf::die &node, bool show = false) {
+  printf("<%" PRIx64 "> %s\n",
+          node.get_section_offset(),
+          to_string(node.tag).c_str());
+  auto attributes = node.attributes();
+  int i = 0, total = attributes.size();
+  for (auto &attr : attributes) {
+    auto key = to_string(attr.first);
+    auto value = to_string(attr.second);
+    INFO("%d/%d %s %s", ++i, total, key.c_str(), value.c_str());
+  }
+}
+
 class SourceLineReader {
   elf::elf *ef = nullptr;
   dwarf::dwarf *dw = nullptr;
@@ -105,7 +146,16 @@ public:
       if (found) {
           auto &lt = cu.get_line_table();
           auto it = lt.find_address(pc);
-          return it == lt.end() ? "" : it->get_description();
+          if (it != lt.end()) return it->get_description();
+
+          vector<dwarf::die> stack;
+          if (find_pc(cu.root(), pc, &stack)) {
+            auto die = stack[0];
+            if (die.has(dwarf::DW_AT::artificial) && die[dwarf::DW_AT::artificial].as_flag()) {
+              return to_string(root[dwarf::DW_AT::name]);
+            }
+          }
+          return "";
       }
     }
     return "";
