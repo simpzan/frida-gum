@@ -151,6 +151,13 @@ public:
           vector<dwarf::die> stack;
           if (find_pc(cu.root(), pc, &stack)) {
             auto die = stack[0];
+
+            auto decl_file_value = die.resolve(dwarf::DW_AT::decl_file);
+            if (decl_file_value.valid()) {
+              auto decl_file = decl_file_value.as_uconstant();
+              return decl_file > 0 ? lt.get_file(decl_file)->path : "";
+            }
+
             if (die.has(dwarf::DW_AT::artificial) && die[dwarf::DW_AT::artificial].as_flag()) {
               return to_string(root[dwarf::DW_AT::name]);
             }
