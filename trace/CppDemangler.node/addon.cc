@@ -96,6 +96,10 @@ public:
     // INFO("%s %p", addr, (void *)pc);
     for (auto &cu: cus) {
       auto root = cu.root();
+      if (!root.has(dwarf::DW_AT::ranges) && !root.has(dwarf::DW_AT::low_pc)) {
+        continue;
+      }
+
       auto range = die_pc_range(root);
       auto found = range.contains(pc);
       if (found) {
