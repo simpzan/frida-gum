@@ -12,7 +12,7 @@
       ],
       'conditions': [
         ['OS=="linux"', {
-          "cflags_cc": [ "-fexceptions" ]
+          "cflags_cc": [ "-fexceptions", "-frtti" ]
         }],
         ['OS=="mac"', {
           'xcode_settings': {
