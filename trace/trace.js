@@ -92,8 +92,7 @@ async function getFunctionsToTrace(rpc, libName) {
     const functionsToTrace = new Map()
     for (const fn of functions) {
         const addr = parseInt(fn.address, 16) - baseAddr;
-        const addr2 = '0x' + addr.toString(16);
-        const srcline = srclineReader.srcline(addr2);
+        const srcline = srclineReader.srcline(addr);
         if (!srcline || srcline.includes('/include/c++/')) continue;
         fn.demangledName = await demangler.demangle(fn.name);
         // log.d(addr2, (srcline), '\t\t', fn.demangledName);

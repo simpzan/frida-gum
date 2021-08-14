@@ -17,7 +17,8 @@ class SourceLineFinder {
         addon.startDwarf(libName);
     }
     srcline(addr) {
-        return addon.srcline(addr);
+        const addrString = '0x' + addr.toString(16);
+        return addon.srcline(addrString);
     }
 }
 module.exports.SourceLineFinder = SourceLineFinder;
