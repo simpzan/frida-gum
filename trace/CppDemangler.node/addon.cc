@@ -217,7 +217,7 @@ void startDwarf(const FunctionCallbackInfo<Value> &args) {
 void stopDwarf(const FunctionCallbackInfo<Value> &args) {
 
 }
-void Init(Local<Object> exports) {
+void Init(v8::Local<v8::Object> exports, v8::Local<v8::Value>, void*) {
   NODE_SET_METHOD(exports, "demangle", demangle);
   NODE_SET_METHOD(exports, "srcline", srcline);
   NODE_SET_METHOD(exports, "startDwarf", startDwarf);
