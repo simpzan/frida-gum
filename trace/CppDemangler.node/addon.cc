@@ -7,6 +7,7 @@
 #include <memory>
 #include <iostream>
 #include <string>
+#include <map>
 #include <node.h>
 #include <cxxabi.h>
 #include "log.h"
@@ -111,6 +112,23 @@ void dump_die(const dwarf::die &node, bool show = false) {
 }
 
 class SourceLineReader {
+  void loadDieR(const dwarf::die &die) {
+    using namespace dwarf;
+    for (auto &child : die) loadDieR(child);
+    if (die.tag != DW_TAG::subprogram) return;
+    if (!die.has(DW_AT::low_pc)) return;
+
+    auto addr = at_low_pc(die);
+    if (functions[addr].valid()) {
+      // INFO("merged function %lx", addr);
+    } else {
+      functions[addr] = die;
+    }
+  }
+  void loadFunctionInfo() {
+    for (auto &cu: cus) loadDieR(cu.root());
+  }
+  std::map<uint64_t, dwarf::die> functions;
   elf::elf *ef = nullptr;
   dwarf::dwarf *dw = nullptr;
   std::vector<dwarf::compilation_unit> cus;
@@ -126,6 +144,7 @@ public:
     dw = new dwarf::dwarf(dwarf::elf::create_loader(*ef));
     cus = dw->compilation_units();
     // INFO("%d", (int)cus.size());
+    loadFunctionInfo();
   }
   ~SourceLineReader() {
     cus.clear();
@@ -133,37 +152,26 @@ public:
     if (dw) delete dw;
   }
   std::string srcline(const char *addr) {
+    using namespace dwarf;
     dwarf::taddr pc = stoll(addr, nullptr, 0);
-    // INFO("%s %p", addr, (void *)pc);
-    for (auto &cu: cus) {
-      auto root = cu.root();
-      if (!root.has(dwarf::DW_AT::ranges) && !root.has(dwarf::DW_AT::low_pc)) {
-        continue;
-      }
+    auto die = functions[pc];
+    if (!die.valid()) return "";
 
-      auto range = die_pc_range(root);
-      auto found = range.contains(pc);
-      if (found) {
-          auto &lt = cu.get_line_table();
-          auto it = lt.find_address(pc);
-          if (it != lt.end()) return it->get_description();
+    auto &cu = (compilation_unit &) die.get_unit();
 
-          vector<dwarf::die> stack;
-          if (find_pc(cu.root(), pc, &stack)) {
-            auto die = stack[0];
+    auto decl_file_value = die.resolve(dwarf::DW_AT::decl_file);
+    if (decl_file_value.valid()) {
+      auto decl_file = decl_file_value.as_uconstant();
+      auto lt = cu.get_line_table();
+      if (decl_file == 0) return "";
 
-            auto decl_file_value = die.resolve(dwarf::DW_AT::decl_file);
-            if (decl_file_value.valid()) {
-              auto decl_file = decl_file_value.as_uconstant();
-              return decl_file > 0 ? lt.get_file(decl_file)->path : "";
-            }
+      auto file = lt.get_file(decl_file);
+      auto line = die.resolve(dwarf::DW_AT::decl_line).as_uconstant();
+      return file->path + ":" + std::to_string(line);
+    }
 
-            if (die.has(dwarf::DW_AT::artificial) && die[dwarf::DW_AT::artificial].as_flag()) {
-              return to_string(root[dwarf::DW_AT::name]);
-            }
-          }
-          return "";
-      }
+    if (die.has(dwarf::DW_AT::artificial) && die[dwarf::DW_AT::artificial].as_flag()) {
+      return to_string(cu.root()[dwarf::DW_AT::name]);
     }
     return "";
   }
