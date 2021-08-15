@@ -9,6 +9,31 @@ const addr2line = new Addr2line(so);
 
 
 let { functions, base } = require('./libsf.json');
+function filterMergedFunctions() {
+    const map = new Map();
+    for (const fn of functions) {
+        const key = fn.address;
+        const existing = map.get(key) || [];
+        existing.push(fn);
+        map.set(key, existing);
+    }
+
+    let i = 0;
+    const uniqueFunctions = [];
+    for (const [key, value] of map) {
+        if (value.length > 1) {
+            ++i;
+            log(i, value.length, value);
+        }
+        else uniqueFunctions.push(value[0]);
+    }
+    const functionNumTotal = functions.length;
+    functions = uniqueFunctions;
+    const uniqueFunctionNum = uniqueFunctions.length
+    log(`unique ${uniqueFunctionNum}, total ${functionNumTotal}`);
+}
+filterMergedFunctions();
+
 let linenum = 667;
 // functions = functions.slice(linenum-1, linenum);
 log(`functions ${functions.length}`);
