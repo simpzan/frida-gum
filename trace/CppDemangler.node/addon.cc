@@ -142,6 +142,30 @@ void getBuidId(const elf::elf &f) {
   printf("\n");
 }
 
+void getFunctions(const elf::elf &f) {
+  for (auto &sec : f.sections()) {
+    auto shdr = sec.get_hdr();
+    if (shdr.type != elf::sht::symtab && shdr.type != elf::sht::dynsym) continue;
+
+    printf("Symbol table '%s':\n", sec.get_name().c_str());
+    printf("%6s: %-16s %-5s %-7s %-7s %-5s %s\n",
+            "Num", "Value", "Size", "Type", "Binding", "Index",
+            "Name");
+    int i = 0;
+    for (auto sym : sec.as_symtab()) {
+      auto &d = sym.get_data();
+      if (d.type() != elf::stt::func || d.shnxd == elf::enums::shn::undef) continue;
+
+      printf("%6d: %016" PRIx64 " %5" PRId64 " %-7s %-7s %5s %s\n",
+              i, d.value, d.size,
+              to_string(d.type()).c_str(),
+              to_string(d.binding()).c_str(),
+              to_string(d.shnxd).c_str(),
+              sym.get_name().c_str());
+    }
+  }
+}
+
 class SourceLineReader {
   void loadDieR(const dwarf::die &die) {
     using namespace dwarf;
@@ -177,6 +201,7 @@ public:
     // INFO("%d", (int)cus.size());
     loadFunctionInfo();
     getBuidId(*ef);
+    getFunctions(*ef);
   }
   ~SourceLineReader() {
     cus.clear();
