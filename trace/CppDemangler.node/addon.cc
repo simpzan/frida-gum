@@ -111,6 +111,37 @@ void dump_die(const dwarf::die &node, bool show = false) {
   }
 }
 
+
+typedef struct {
+    uint32_t namesz;
+    uint32_t descsz;
+    uint32_t type;
+    uint8_t data[];
+} ElfNoteSection_t;
+#ifndef NT_GNU_BUILD_ID
+#define NT_GNU_BUILD_ID 3
+#endif
+
+std::vector<uint8_t> get_build_id(const elf::section &section) {
+  ElfNoteSection_t *nhdr = (ElfNoteSection_t *)section.data();
+  if (nhdr->type != NT_GNU_BUILD_ID) return {};
+  if (strcmp((char *)nhdr->data, "GNU")) return {};
+  const uint8_t *bytes = nhdr->data + nhdr->namesz;
+  std::vector<uint8_t> id(bytes, bytes + nhdr->descsz);
+  return id;
+}
+void getBuidId(const elf::elf &f) {
+  std::vector<uint8_t> id;
+  for (auto &sec : f.sections()) {
+    if (sec.get_name() == ".note.gnu.build-id") {
+      id = get_build_id(sec);
+      break;
+    }
+  }
+  for (auto byte: id) printf("%02x", byte);
+  printf("\n");
+}
+
 class SourceLineReader {
   void loadDieR(const dwarf::die &die) {
     using namespace dwarf;
@@ -145,6 +176,7 @@ public:
     cus = dw->compilation_units();
     // INFO("%d", (int)cus.size());
     loadFunctionInfo();
+    getBuidId(*ef);
   }
   ~SourceLineReader() {
     cus.clear();
