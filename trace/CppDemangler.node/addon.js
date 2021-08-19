@@ -26,6 +26,7 @@ class SourceLineFinder {
     getBuidId() {
         return addon.getBuidId();
     }
+    getFunctions() { return addon.getFunctions(); }
 }
 module.exports.SourceLineFinder = SourceLineFinder;
 
@@ -46,6 +47,30 @@ function test() {
     const vaddr = reader.getVirtualAddress();
     const buildid = reader.getBuidId();
     console.log(`vaddr ${vaddr.toString(16)}, buildid ${buildid}`);
+    const functions = reader.getFunctions();
+    const cus = {};
+    for (const fn of functions) {
+        const src = reader.srcline(fn.addr);
+        fn.src = src;
+        const fns = cus[src] || [];
+        fns.push(fn);
+        cus[src] = fns;
+    }
+    const files = Object.keys(cus);
+    files.sort();
+    let count = 0;
+    for (const file of files) {
+        const fns = cus[file];
+        if (!file.startsWith('frameworks/native/services/surfaceflinger')) continue;
+        count += fns.length;
+        console.log('========', fns.length, file);
+        let i = 0, total = fns.length;
+        for (const fn of fns) {
+            ++i;
+            console.log(`${i}/${total} 0x${fn.addr.toString(16)} ${fn.name}`);
+        }
+    }
+    console.log(`${count} ${functions.length}`);
     const inputs = process.argv.slice(3);
     for (const input of inputs) {
         const output = reader.srcline(input);
