@@ -142,28 +142,14 @@ void getBuidId(const elf::elf &f) {
   printf("\n");
 }
 
-void getFunctions(const elf::elf &f) {
-  for (auto &sec : f.sections()) {
-    auto shdr = sec.get_hdr();
-    if (shdr.type != elf::sht::symtab && shdr.type != elf::sht::dynsym) continue;
-
-    printf("Symbol table '%s':\n", sec.get_name().c_str());
-    printf("%6s: %-16s %-5s %-7s %-7s %-5s %s\n",
-            "Num", "Value", "Size", "Type", "Binding", "Index",
-            "Name");
-    int i = 0;
-    for (auto sym : sec.as_symtab()) {
-      auto &d = sym.get_data();
-      if (d.type() != elf::stt::func || d.shnxd == elf::enums::shn::undef) continue;
-
-      printf("%6d: %016" PRIx64 " %5" PRId64 " %-7s %-7s %5s %s\n",
-              i, d.value, d.size,
-              to_string(d.type()).c_str(),
-              to_string(d.binding()).c_str(),
-              to_string(d.shnxd).c_str(),
-              sym.get_name().c_str());
-    }
-  }
+bool sameDie(const dwarf::die &die1, const dwarf::die &die2) {
+  auto name1 = die1.resolve(dwarf::DW_AT::linkage_name).as_string();
+  auto name2 = die2.resolve(dwarf::DW_AT::linkage_name).as_string();
+  name1 = demangle(name1.c_str());
+  name2 = demangle(name2.c_str());
+  auto result = name1 == name2;
+  if (!result) INFO("%s %s %d", name1.c_str(), name2.c_str(), result);
+  return result;
 }
 
 class SourceLineReader {
@@ -174,10 +160,16 @@ class SourceLineReader {
     if (!die.has(DW_AT::low_pc)) return;
 
     auto addr = at_low_pc(die);
-    if (functions[addr].valid()) {
-      // INFO("merged function %lx", addr);
-    } else {
+    if (addr == 0) return;
+
+    auto found = functions[addr];
+    if (!found.valid()) {
       functions[addr] = die;
+    } else if (!sameDie(found, die)) {
+      INFO("merged function %lx", addr);
+      dump_die(found);
+      dump_die(die);
+      INFO("\n\n");
     }
   }
   void loadFunctionInfo() {
@@ -201,7 +193,6 @@ public:
     // INFO("%d", (int)cus.size());
     loadFunctionInfo();
     getBuidId(*ef);
-    getFunctions(*ef);
   }
   ~SourceLineReader() {
     cus.clear();
