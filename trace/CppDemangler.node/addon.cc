@@ -165,6 +165,16 @@ int64_t getVirtualAddress(const elf::elf &ef) {
   return -1;
 }
 
+std::string getName(const dwarf::die &die) {
+  std::string name0;
+  auto linkage_name = die.resolve(dwarf::DW_AT::linkage_name);
+  if (linkage_name.valid()) name0 = linkage_name.as_string();
+  else {
+    auto name_die = die.resolve(dwarf::DW_AT::name);
+    if (name_die.valid()) name0 = name_die.as_string();
+  }
+  return demangle(name0.c_str());
+}
 bool sameDie(const dwarf::die &die1, const dwarf::die &die2) {
   auto name1 = die1.resolve(dwarf::DW_AT::linkage_name).as_string();
   auto name2 = die2.resolve(dwarf::DW_AT::linkage_name).as_string();
@@ -198,12 +208,12 @@ class SourceLineReader {
   void loadFunctionInfo() {
     for (auto &cu: cus) loadDieR(cu.root());
   }
-  std::map<uint64_t, dwarf::die> functions;
   elf::elf *ef = nullptr;
   dwarf::dwarf *dw = nullptr;
   std::vector<dwarf::compilation_unit> cus;
   uint64_t vaddr = 0;
 public:
+  std::map<uint64_t, dwarf::die> functions;
   uint64_t getVirtualAddress() { return vaddr; }
   void init(const char *file) {
     int fd = open(file, O_RDONLY);
@@ -218,7 +228,7 @@ public:
     // INFO("%d", (int)cus.size());
     loadFunctionInfo();
     vaddr = ::getVirtualAddress(*ef);
-    INFO("vaddr %lx", vaddr);
+    INFO("vaddr %lx, %d", vaddr, (int)functions.size());
   }
   ~SourceLineReader() {
     cus.clear();
@@ -247,6 +257,7 @@ public:
 
       auto file = lt.get_file(decl_file);
       auto line = die.resolve(dwarf::DW_AT::decl_line).as_uconstant();
+      return file->path;
       return file->path + ":" + std::to_string(line);
     }
 
@@ -323,6 +334,22 @@ void getBuidId(const FunctionCallbackInfo<Value> &args) {
   auto idValue = String::NewFromUtf8(isolate, id.c_str()).ToLocalChecked();
   args.GetReturnValue().Set(idValue);
 }
+void getFunctions(const FunctionCallbackInfo<Value> &args) {
+  Isolate* isolate = args.GetIsolate();
+  Local<Context> context = isolate->GetCurrentContext();
+  Local<Array> myArray = Array::New(isolate);
+  int i = 0;
+  for (auto &entry: srclineReader.functions) {
+    Local<Object> obj = Object::New(isolate);
+    Local<Number> addr = Number::New(isolate, entry.first);
+    obj->Set(context, String::NewFromUtf8(isolate, "addr").ToLocalChecked(), addr);
+    auto name = String::NewFromUtf8(isolate, getName(entry.second).c_str()).ToLocalChecked();
+    obj->Set(context, String::NewFromUtf8(isolate, "name").ToLocalChecked(), name);
+    myArray->Set(context, i, obj);
+    ++i;
+  }
+  args.GetReturnValue().Set(myArray);
+}
 void Init(v8::Local<v8::Object> exports, v8::Local<v8::Value>, void*) {
   NODE_SET_METHOD(exports, "demangle", demangle);
   NODE_SET_METHOD(exports, "srcline", srcline);
@@ -330,6 +357,7 @@ void Init(v8::Local<v8::Object> exports, v8::Local<v8::Value>, void*) {
   NODE_SET_METHOD(exports, "stopDwarf", stopDwarf);
   NODE_SET_METHOD(exports, "getVirtualAddress", getVirtualAddress);
   NODE_SET_METHOD(exports, "getBuidId", getBuidId);
+  NODE_SET_METHOD(exports, "getFunctions", getFunctions);
 }
 
 NODE_MODULE(addon, Init)
