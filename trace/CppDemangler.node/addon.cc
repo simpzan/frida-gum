@@ -142,6 +142,17 @@ void getBuidId(const elf::elf &f) {
   printf("\n");
 }
 
+int64_t getVirtualAddress(const elf::elf &ef) {
+  using namespace elf;
+  for (auto &seg : ef.segments()) {
+    auto &hdr = seg.get_hdr();
+    if (hdr.type != pt::load) continue;
+    if ((hdr.flags & pf::x) != pf::x) continue;
+    return hdr.vaddr;
+  }
+  return -1;
+}
+
 bool sameDie(const dwarf::die &die1, const dwarf::die &die2) {
   auto name1 = die1.resolve(dwarf::DW_AT::linkage_name).as_string();
   auto name2 = die2.resolve(dwarf::DW_AT::linkage_name).as_string();
@@ -193,6 +204,7 @@ public:
     // INFO("%d", (int)cus.size());
     loadFunctionInfo();
     getBuidId(*ef);
+    INFO("vaddr %lx", (uint64_t)getVirtualAddress(*ef));
   }
   ~SourceLineReader() {
     cus.clear();
