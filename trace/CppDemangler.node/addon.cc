@@ -190,7 +190,9 @@ class SourceLineReader {
   elf::elf *ef = nullptr;
   dwarf::dwarf *dw = nullptr;
   std::vector<dwarf::compilation_unit> cus;
+  uint64_t vaddr = 0;
 public:
+  uint64_t getVirtualAddress() { return vaddr; }
   void init(const char *file) {
     int fd = open(file, O_RDONLY);
     if (fd < 0) {
@@ -204,7 +206,8 @@ public:
     // INFO("%d", (int)cus.size());
     loadFunctionInfo();
     getBuidId(*ef);
-    INFO("vaddr %lx", (uint64_t)getVirtualAddress(*ef));
+    vaddr = ::getVirtualAddress(*ef);
+    INFO("vaddr %lx", vaddr);
   }
   ~SourceLineReader() {
     cus.clear();
@@ -292,11 +295,17 @@ void startDwarf(const FunctionCallbackInfo<Value> &args) {
 void stopDwarf(const FunctionCallbackInfo<Value> &args) {
 
 }
+void getVirtualAddress(const FunctionCallbackInfo<Value> &args) {
+  Isolate* isolate = args.GetIsolate();
+  Local<Number> num = Number::New(isolate, srclineReader.getVirtualAddress());
+  args.GetReturnValue().Set(num);
+}
 void Init(v8::Local<v8::Object> exports, v8::Local<v8::Value>, void*) {
   NODE_SET_METHOD(exports, "demangle", demangle);
   NODE_SET_METHOD(exports, "srcline", srcline);
   NODE_SET_METHOD(exports, "startDwarf", startDwarf);
   NODE_SET_METHOD(exports, "stopDwarf", stopDwarf);
+  NODE_SET_METHOD(exports, "getVirtualAddress", getVirtualAddress);
 }
 
 NODE_MODULE(addon, Init)

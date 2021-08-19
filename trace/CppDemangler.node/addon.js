@@ -20,6 +20,9 @@ class SourceLineFinder {
         const addrString = '0x' + addr.toString(16);
         return addon.srcline(addrString);
     }
+    getVirtualAddress() {
+        return addon.getVirtualAddress();
+    }
 }
 module.exports.SourceLineFinder = SourceLineFinder;
 
@@ -37,6 +40,8 @@ function test() {
     console.log(process.argv)
     const soFile = process.argv[2]
     const reader = new SourceLineFinder(soFile);
+    const vaddr = reader.getVirtualAddress();
+    console.log(`vaddr ${vaddr.toString(16)}`);
     const inputs = process.argv.slice(3);
     for (const input of inputs) {
         const output = reader.srcline(input);
