@@ -23,6 +23,9 @@ class SourceLineFinder {
     getVirtualAddress() {
         return addon.getVirtualAddress();
     }
+    getBuidId() {
+        return addon.getBuidId();
+    }
 }
 module.exports.SourceLineFinder = SourceLineFinder;
 
@@ -41,7 +44,8 @@ function test() {
     const soFile = process.argv[2]
     const reader = new SourceLineFinder(soFile);
     const vaddr = reader.getVirtualAddress();
-    console.log(`vaddr ${vaddr.toString(16)}`);
+    const buildid = reader.getBuidId();
+    console.log(`vaddr ${vaddr.toString(16)}, buildid ${buildid}`);
     const inputs = process.argv.slice(3);
     for (const input of inputs) {
         const output = reader.srcline(input);

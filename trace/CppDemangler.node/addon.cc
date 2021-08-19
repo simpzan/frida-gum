@@ -15,6 +15,19 @@
 using namespace v8;
 using namespace std;
 
+std::string bytes_to_hex_string(const std::vector<uint8_t> &input) {
+  static const char characters[] = "0123456789abcdef";
+  // Zeroes out the buffer unnecessarily, can't be avoided for std::string.
+  std::string ret(input.size() * 2, 0);
+  // Hack... Against the rules but avoids copying the whole buffer.
+  char *buf = const_cast<char *>(ret.data());
+  for (const auto &oneInputByte : input) {
+    *buf++ = characters[oneInputByte >> 4];
+    *buf++ = characters[oneInputByte & 0x0F];
+  }
+  return ret;
+}
+
 static std::string demangle(const char *mangled_name, bool quiet = true) {
   int status = 0;
   const char *realname = abi::__cxa_demangle(mangled_name, 0, 0, &status);
@@ -130,7 +143,7 @@ std::vector<uint8_t> get_build_id(const elf::section &section) {
   std::vector<uint8_t> id(bytes, bytes + nhdr->descsz);
   return id;
 }
-void getBuidId(const elf::elf &f) {
+std::vector<uint8_t> getBuidId(const elf::elf &f) {
   std::vector<uint8_t> id;
   for (auto &sec : f.sections()) {
     if (sec.get_name() == ".note.gnu.build-id") {
@@ -138,8 +151,7 @@ void getBuidId(const elf::elf &f) {
       break;
     }
   }
-  for (auto byte: id) printf("%02x", byte);
-  printf("\n");
+  return id;
 }
 
 int64_t getVirtualAddress(const elf::elf &ef) {
@@ -205,7 +217,6 @@ public:
     cus = dw->compilation_units();
     // INFO("%d", (int)cus.size());
     loadFunctionInfo();
-    getBuidId(*ef);
     vaddr = ::getVirtualAddress(*ef);
     INFO("vaddr %lx", vaddr);
   }
@@ -213,6 +224,12 @@ public:
     cus.clear();
     if (ef) delete ef;
     if (dw) delete dw;
+  }
+  std::string getBuidId() {
+    auto bytes = ::getBuidId(*ef);
+    auto id = bytes_to_hex_string(bytes);
+    INFO("build id %s", id.c_str());
+    return id;
   }
   std::string srcline(const char *addr) {
     using namespace dwarf;
@@ -300,12 +317,19 @@ void getVirtualAddress(const FunctionCallbackInfo<Value> &args) {
   Local<Number> num = Number::New(isolate, srclineReader.getVirtualAddress());
   args.GetReturnValue().Set(num);
 }
+void getBuidId(const FunctionCallbackInfo<Value> &args) {
+  Isolate* isolate = args.GetIsolate();
+  auto id = srclineReader.getBuidId();
+  auto idValue = String::NewFromUtf8(isolate, id.c_str()).ToLocalChecked();
+  args.GetReturnValue().Set(idValue);
+}
 void Init(v8::Local<v8::Object> exports, v8::Local<v8::Value>, void*) {
   NODE_SET_METHOD(exports, "demangle", demangle);
   NODE_SET_METHOD(exports, "srcline", srcline);
   NODE_SET_METHOD(exports, "startDwarf", startDwarf);
   NODE_SET_METHOD(exports, "stopDwarf", stopDwarf);
   NODE_SET_METHOD(exports, "getVirtualAddress", getVirtualAddress);
+  NODE_SET_METHOD(exports, "getBuidId", getBuidId);
 }
 
 NODE_MODULE(addon, Init)
