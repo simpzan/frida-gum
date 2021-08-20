@@ -50,7 +50,9 @@ function test() {
     const functions = reader.getFunctions();
     const cus = {};
     for (const fn of functions) {
-        const src = reader.srcline(fn.addr);
+        const info = reader.srcline(fn.addr);
+        const src = info.file;
+        fn.line = info.line;
         fn.src = src;
         const fns = cus[src] || [];
         fns.push(fn);
@@ -67,7 +69,7 @@ function test() {
         let i = 0, total = fns.length;
         for (const fn of fns) {
             ++i;
-            console.log(`${i}/${total} 0x${fn.addr.toString(16)} ${fn.name}`);
+            console.log(`${i}/${total} 0x${fn.addr.toString(16)} ${fn.line} ${fn.name}`);
         }
     }
     console.log(`${count} ${functions.length}`);

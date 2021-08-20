@@ -241,11 +241,11 @@ public:
     INFO("build id %s", id.c_str());
     return id;
   }
-  std::string srcline(const char *addr) {
+  std::pair<std::string, int> srcline(const char *addr) {
     using namespace dwarf;
     dwarf::taddr pc = stoll(addr, nullptr, 0);
     auto die = functions[pc];
-    if (!die.valid()) return "";
+    if (!die.valid()) return {};
 
     auto &cu = (compilation_unit &) die.get_unit();
 
@@ -253,24 +253,25 @@ public:
     if (decl_file_value.valid()) {
       auto decl_file = decl_file_value.as_uconstant();
       auto lt = cu.get_line_table();
-      if (decl_file == 0) return "";
+      if (decl_file == 0) return {};
 
       auto file = lt.get_file(decl_file);
       auto line = die.resolve(dwarf::DW_AT::decl_line).as_uconstant();
-      return file->path;
-      return file->path + ":" + std::to_string(line);
+      // return file->path;
+      return {file->path, line};
     }
 
     if (die.has(dwarf::DW_AT::artificial) && die[dwarf::DW_AT::artificial].as_flag()) {
-      return to_string(cu.root()[dwarf::DW_AT::name]);
+      return {to_string(cu.root()[dwarf::DW_AT::name]), -1};
     }
-    return "";
+    return {};
   }
 };
 SourceLineReader srclineReader;
 
 void srcline(const FunctionCallbackInfo<Value> &args) {
   Isolate *isolate = args.GetIsolate();
+  Local<Context> context = isolate->GetCurrentContext();
 
   // Check the number of arguments passed.
   if (args.Length() != 1) {
@@ -287,7 +288,7 @@ void srcline(const FunctionCallbackInfo<Value> &args) {
     return;
   }
 
-  std::string res;
+  std::pair<std::string, int> res;
   try {
     v8::String::Utf8Value str1(isolate, args[0]);
     res = srclineReader.srcline(*str1);
@@ -295,8 +296,12 @@ void srcline(const FunctionCallbackInfo<Value> &args) {
     std::cerr << e.what() << '\n';
   }
 
-  args.GetReturnValue().Set(
-      String::NewFromUtf8(isolate, res.c_str()).ToLocalChecked());
+  Local<Object> obj = Object::New(isolate);
+  auto file = String::NewFromUtf8(isolate, res.first.c_str()).ToLocalChecked();
+  auto line = Number::New(isolate, res.second);
+  obj->Set(context, String::NewFromUtf8(isolate, "file").ToLocalChecked(), file);
+  obj->Set(context, String::NewFromUtf8(isolate, "line").ToLocalChecked(), line);
+  args.GetReturnValue().Set(obj);
 }
 void startDwarf(const FunctionCallbackInfo<Value> &args) {
   Isolate *isolate = args.GetIsolate();
