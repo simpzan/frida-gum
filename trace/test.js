@@ -13,6 +13,18 @@ function getNativeFunction(module, name, argumentTypes = [], returnType = 'void'
     return fn;
 }
 
+function getBuidId(soPath) {
+    const getBuidId_addr = Module.getExportByName('libtrace.so', 'getBuidId');
+    const getBuidId = new NativeFunction(getBuidId_addr, 'int', ['pointer', 'pointer', 'int']);
+    const soPath2 = Memory.allocUtf8String(soPath);
+    const length = 64;
+    const bytes = Memory.alloc(length);
+    const size = getBuidId(soPath2, bytes, length);
+    if (0 < size && size < length) return bytes.readUtf8String();
+    log(`failed to getBuildId(${soPath}): ${size}`);
+    return "";
+}
+
 function loadLibTrace(path, callback) {
     const module = Module.load(path);
     const sendDataFn = module.getExportByName('_sendDataFn');
@@ -40,7 +52,7 @@ const onTraceEvent = function(bytes, length, tid) {
 
 class Tracer {
     constructor() {
-        const libtracePath = '/home/simpzan/frida/frida/build/tmp_thin-linux-x86_64/frida-gum/trace/libtrace.so';
+        const libtracePath = '/system/lib64/libtrace.so';
         this.attachCallbacks = loadLibTrace(libtracePath, onTraceEvent);
     }
     traceFunctions(functionAddresses) {
@@ -63,6 +75,7 @@ class Tracer {
 const tracer = new Tracer();
 
 rpc.exports = {
+    getBuidId(path) { return getBuidId(path); },
     getModuleByName(libName) {
         return Process.getModuleByName(libName);
     },

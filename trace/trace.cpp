@@ -8,8 +8,44 @@
 #include <fstream>
 #include <sstream>
 #include <memory>
+#include <vector>
 #include <gum/guminterceptor.h>
 #include <gum/gumlog.h>
+
+using namespace std;
+
+std::string bytes_to_hex_string(const uint8_t *bytes, int length) {
+  static const char characters[] = "0123456789abcdef";
+  // Zeroes out the buffer unnecessarily, can't be avoided for std::string.
+  std::string ret(length * 2, 0);
+  // Hack... Against the rules but avoids copying the whole buffer.
+  char *buf = const_cast<char *>(ret.data());
+  for (int i=0; i<length; ++i) {
+    uint8_t oneInputByte = bytes[i];
+    *buf++ = characters[oneInputByte >> 4];
+    *buf++ = characters[oneInputByte & 0x0F];
+  }
+  return ret;
+}
+
+extern "C" {
+
+#include "build-id.h"
+int getBuidId(const char *name, char *bytes, int length) {
+  auto note = build_id_find_nhdr_by_name(name);
+  if (!note) return 0;
+
+  if (build_id_length(note) <= 0) return 0;
+
+  auto data = build_id_data(note);
+  int datalen = build_id_length(note);
+  auto id = bytes_to_hex_string(data, datalen);
+  strncpy(bytes, id.c_str(), length);
+  INFO("build id %s", id.c_str());
+  return min(length, datalen);
+}
+
+}
 
 static inline std::string readFile(const char *filename) {
   std::ifstream ifs(filename);
