@@ -19,14 +19,13 @@ function onMessageFromDebuggee(msg, bytes) {
             return log.i(`thread ${id} ${name}`);
         }
         for (let i = 0; i < bytes.length; ) {
-            const addr = '0x' + bytes.readBigUInt64LE(i).toString(16); i += 8;
-            let ts = bytes.readBigInt64LE(i); i += 8;
+            const addr = Number(bytes.readBigUInt64LE(i)); i += 8;
+            let ts = Number(bytes.readBigInt64LE(i)); i += 8;
             const ph = ts > 0 ? 'B' : 'E';
             ts = ts > 0 ? ts : -ts;
-            ts = ts.toString(10);
-            const event = { ph, tid, pid, addr, ts };
+            const event = { ph, tid, pid, addr, ts: ts };
             events.push(event);
-            log.i(event);
+            // log.i(event);
         }
     } else {
         log.e(`unkown msg`, ...arguments);
@@ -52,6 +51,7 @@ function writeChromeTracingFile(filename, functionMap) {
     const traceFile = new ChromeTracingFile(filename);
     for (const trace of events) {
         const fn = functionMap.get(trace.addr);
+        if (!fn) return log.e(`can't find function info for event: ${trace}`);
         trace.name = fn.demangledName || fn.name;
         traceFile.writeObject(trace);
     }
@@ -64,11 +64,11 @@ function writeChromeTracingFile(filename, functionMap) {
     traceFile.close();
 }
 async function attachProcess(processName, sourceFilename) {
-    // const device = await frida.getUsbDevice();
-    // if (!device) return log.e('no usb device found.');
+    const device = await frida.getUsbDevice();
+    if (!device) return log.e('no usb device found.');
 
     log.i(`tracing process ${processName}`);
-    const session = await frida.attach(processName);
+    const session = await device.attach(processName);
     const source = fs.readFileSync(sourceFilename, "utf8");
     const script = await session.createScript(source, { runtime: 'v8' });
     script.message.connect(onMessageFromDebuggee);
@@ -85,22 +85,23 @@ function isRunning(program) {
 async function getFunctionsToTrace(rpc, libName) {
     const module = await rpc.getModuleByName(libName);
     const baseAddr = parseInt(module.base, 16);
-    const srclineReader = new CppDemangler.SourceLineFinder(module.path);
-    const demangler = new CppDemangler();
-    let functions = await rpc.getFunctionsOfModule(libName);
-
+    const srclineReader = new CppDemangler.SourceLineFinder("/tmp/" + module.name);
+    const vaddr = srclineReader.getVirtualAddress();
+    const buildIdLocal = srclineReader.getBuidId();
+    const buildIdRemote = await rpc.getBuidId(module.path);
+    if (buildIdLocal != buildIdRemote) {
+        return log.e(`build id mismatch ${buildIdLocal} ${buildIdRemote}`);
+    }
+    let functions = srclineReader.getFunctions();
     const functionsToTrace = new Map()
     for (const fn of functions) {
-        const addr = parseInt(fn.address, 16) - baseAddr;
-        const srcline = srclineReader.srcline(addr);
-        if (!srcline || srcline.includes('/include/c++/')) continue;
-        fn.demangledName = await demangler.demangle(fn.name);
-        // log.d(addr2, (srcline), '\t\t', fn.demangledName);
-
-        functionsToTrace.set(fn.address, fn);
+        const addr = fn.addr - vaddr + baseAddr;
+        const info = srclineReader.srcline(fn.addr);
+        if (!info.file.startsWith('frameworks/native/services/surfaceflinger')) continue;
+        fn.file = info.file;
+        fn.line = info.line;
+        functionsToTrace.set(addr, fn);
     }
-    demangler.exit();
-
     return functionsToTrace;
 }
 
