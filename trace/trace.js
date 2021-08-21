@@ -63,11 +63,11 @@ function writeChromeTracingFile(filename, functionMap) {
     }
     traceFile.close();
 }
-async function attachProcess(processName, sourceFilename) {
-    const device = await frida.getUsbDevice();
-    if (!device) return log.e('no usb device found.');
+async function attachProcess(deviceId, processName, sourceFilename) {
+    const device = await frida.getDevice(deviceId);
+    if (!device) return log.e(`device '${deviceId}' not found.`);
 
-    log.i(`tracing process ${processName}`);
+    log.i(`tracing process '${processName}' of device '${device.name}'`);
     const session = await device.attach(processName);
     const source = fs.readFileSync(sourceFilename, "utf8");
     const script = await session.createScript(source, { runtime: 'v8' });
@@ -109,8 +109,9 @@ async function main() {
     const argv = process.argv;
     log.i("argv", argv);
 
-    const processName = argv[2] || "main";
-    const libName = argv[3] || "libtest.so";
+    const deviceId = argv[2];
+    const processName = argv[3] || "main";
+    const libName = argv[4] || "libtest.so";
     const sourceFilename = "./test.js";
 
     process.env['LD_LIBRARY_PATH'] = '/home/simpzan/frida/cpp-example';
@@ -118,7 +119,7 @@ async function main() {
     let pid = 0;
     if (!running) pid = await frida.spawn(['/home/simpzan/frida/cpp-example/main']);
 
-    const script = await attachProcess(processName, sourceFilename);
+    const script = await attachProcess(deviceId, processName, sourceFilename);
 
     const functionsToTrace = await getFunctionsToTrace(script.exports, libName);
     await script.exports.startTracing([...functionsToTrace.keys()]);
