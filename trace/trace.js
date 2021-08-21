@@ -63,10 +63,17 @@ function writeChromeTracingFile(filename, functionMap) {
     }
     traceFile.close();
 }
+let targetDevice = null;
+function isAndroid() { return targetDevice && targetDevice.type === 'usb'; }
+function getBinaryLocalPath(module) {
+    if (isAndroid()) return `/tmp/${module.name}`;
+    return module.path;
+}
 async function attachProcess(deviceId, processName, sourceFilename) {
     const device = await frida.getDevice(deviceId);
     if (!device) return log.e(`device '${deviceId}' not found.`);
 
+    targetDevice = device;
     log.i(`tracing process '${processName}' of device '${device.name}'`);
     const session = await device.attach(processName);
     const source = fs.readFileSync(sourceFilename, "utf8");
@@ -82,10 +89,10 @@ function isRunning(program) {
     return out && out.length;
 }
 
-async function getFunctionsToTrace(rpc, libName) {
+async function getFunctionsToTrace(rpc, libName, srclinePrefix) {
     const module = await rpc.getModuleByName(libName);
     const baseAddr = parseInt(module.base, 16);
-    const srclineReader = new CppDemangler.SourceLineFinder("/tmp/" + module.name);
+    const srclineReader = new CppDemangler.SourceLineFinder(getBinaryLocalPath(module));
     const vaddr = srclineReader.getVirtualAddress();
     const buildIdLocal = srclineReader.getBuidId();
     const buildIdRemote = await rpc.getBuidId(module.path);
@@ -97,7 +104,7 @@ async function getFunctionsToTrace(rpc, libName) {
     for (const fn of functions) {
         const addr = fn.addr - vaddr + baseAddr;
         const info = srclineReader.srcline(fn.addr);
-        if (!info.file.startsWith('frameworks/native/services/surfaceflinger')) continue;
+        if (srclinePrefix && !info.file.startsWith(srclinePrefix)) continue;
         fn.file = info.file;
         fn.line = info.line;
         functionsToTrace.set(addr, fn);
@@ -112,6 +119,7 @@ async function main() {
     const deviceId = argv[2];
     const processName = argv[3] || "main";
     const libName = argv[4] || "libtest.so";
+    const srclinePrefix = argv[5];
     const sourceFilename = "./test.js";
 
     process.env['LD_LIBRARY_PATH'] = '/home/simpzan/frida/cpp-example';
@@ -121,7 +129,7 @@ async function main() {
 
     const script = await attachProcess(deviceId, processName, sourceFilename);
 
-    const functionsToTrace = await getFunctionsToTrace(script.exports, libName);
+    const functionsToTrace = await getFunctionsToTrace(script.exports, libName, srclinePrefix);
     await script.exports.startTracing([...functionsToTrace.keys()]);
 
     if (pid) await frida.resume(pid);

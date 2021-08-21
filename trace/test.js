@@ -52,7 +52,7 @@ const onTraceEvent = function(bytes, length, tid) {
 
 class Tracer {
     constructor() {
-        const libtracePath = '/system/lib64/libtrace.so';
+        const libtracePath = 'libtrace.so';
         this.attachCallbacks = loadLibTrace(libtracePath, onTraceEvent);
     }
     traceFunctions(functionAddresses) {
