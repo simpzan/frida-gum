@@ -91,9 +91,10 @@ function isRunning(program) {
 
 async function getFunctionsToTrace(rpc, libName, srclinePrefix) {
     const module = await rpc.getModuleByName(libName);
+    log.i(module);
     const baseAddr = parseInt(module.base, 16);
     const srclineReader = new CppDemangler.SourceLineFinder(getBinaryLocalPath(module));
-    const vaddr = srclineReader.getVirtualAddress();
+    const vaddr = isAndroid() ? srclineReader.getVirtualAddress() : 0;
     const buildIdLocal = srclineReader.getBuidId();
     const buildIdRemote = await rpc.getBuidId(module.path);
     if (buildIdLocal != buildIdRemote) {
