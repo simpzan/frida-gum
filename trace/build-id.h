@@ -22,7 +22,10 @@
  * IN THE SOFTWARE.
  */
 
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
+
 #include <link.h>
 
 struct build_id_note;

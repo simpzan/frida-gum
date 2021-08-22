@@ -22,13 +22,12 @@
  * IN THE SOFTWARE.
  */
 
-#define _GNU_SOURCE
+#include "build-id.h"
 #include <dlfcn.h>
 #include <link.h>
 #include <stddef.h>
 #include <string.h>
 
-#include "build-id.h"
 
 #ifndef NT_GNU_BUILD_ID
 #define NT_GNU_BUILD_ID 3
