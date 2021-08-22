@@ -126,15 +126,14 @@ struct EventBuffer {
 };
 
 thread_local EventBuffer buffer;
-void recordEvent(GumInvocationContext *ic, char ph) {
+void recordEvent(GumInvocationContext *ic, int ph) {
   gpointer fn = gum_invocation_context_get_listener_function_data(ic);
-  int32_t ts = getRelativeTimestamp();
-  if (ph == 'E') ts *= -1;
+  int32_t ts = getRelativeTimestamp() * ph;
   // INFO("%p %ld", fn, ts);
   buffer.write(fn, ts);
 }
-extern "C" void onEnter(GumInvocationContext * ic) { recordEvent(ic, 'B'); }
-extern "C" void onLeave(GumInvocationContext * ic) { recordEvent(ic, 'E'); }
+extern "C" void onEnter(GumInvocationContext * ic) { recordEvent(ic, 1); }
+extern "C" void onLeave(GumInvocationContext * ic) { recordEvent(ic, -1); }
 extern "C" void flushAll() {
   TRACE();
   std::unique_lock<std::mutex> lock(buffersMutex);
