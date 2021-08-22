@@ -115,7 +115,7 @@ struct EventBuffer {
   }
  private:
   Event *events = NULL;
-  int count = 128;
+  int count = 1024 * 256;
   int current = 0;
   int tid = 0;
 };
