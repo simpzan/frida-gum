@@ -124,11 +124,12 @@ async function getFunctionsToTrace(rpc, libName, srclinePrefix) {
     let functions = srclineReader.getFunctions();
     const functionsToTrace = new Map()
     for (const fn of functions) {
-        const addr = fn.addr - vaddr + baseAddr;
+        if (fn.name.includes('~')) continue;
         const info = srclineReader.srcline(fn.addr);
         if (srclinePrefix && !info.file.startsWith(srclinePrefix)) continue;
         fn.file = info.file;
         fn.line = info.line;
+        const addr = fn.addr - vaddr + baseAddr;
         functionsToTrace.set(addr, fn);
     }
     const modules = ['/system/lib64/libGLESv2.so', '/system/lib64/libEGL.so'];
