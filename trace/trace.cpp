@@ -71,13 +71,17 @@ sendDataFn _sendDataFn = NULL;
 
 typedef struct __attribute__((__packed__)) Event_ {
   uint16_t fn;
-  gint64 ts;
+  int32_t ts;
 } Event;
-static_assert (sizeof(Event) == 10, "Size is not correct");
+static_assert (sizeof(Event) == 6, "Size is not correct");
 
 std::mutex buffersMutex;
 struct EventBuffer;
 std::unordered_set<EventBuffer *> buffers;
+static gint64 baseTimestamp = 0;
+static inline uint32_t getRelativeTimestamp() {
+  return g_get_real_time() - baseTimestamp;
+}
 
 struct EventBuffer {
   EventBuffer() {
@@ -95,7 +99,7 @@ struct EventBuffer {
     free(events); events = NULL;
     TRACE();
   }
-  void write(gpointer fn, int64_t ts) {
+  void write(gpointer fn, int32_t ts) {
     auto event = events + current;
     event->fn = (uint16_t)GPOINTER_TO_SIZE(fn);
     event->ts = ts;
@@ -124,7 +128,7 @@ struct EventBuffer {
 thread_local EventBuffer buffer;
 void recordEvent(GumInvocationContext *ic, char ph) {
   gpointer fn = gum_invocation_context_get_listener_function_data(ic);
-  gint64 ts = g_get_real_time();
+  int32_t ts = getRelativeTimestamp();
   if (ph == 'E') ts *= -1;
   // INFO("%p %ld", fn, ts);
   buffer.write(fn, ts);
@@ -137,7 +141,8 @@ extern "C" void flushAll() {
   for (auto buf: buffers) buf->flushAll();
 }
 __attribute__((constructor)) void init (void) {
-  INFO ("init");
+  baseTimestamp = g_get_real_time();
+  INFO ("init %f", baseTimestamp/1000000.0);
 }
 __attribute__((destructor)) void finalize (void) {
   INFO ("finalize");

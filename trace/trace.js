@@ -20,7 +20,7 @@ function onMessageFromDebuggee(msg, bytes) {
         }
         for (let i = 0; i < bytes.length; ) {
             const addr = Number(bytes.readUInt16LE(i)); i += 2;
-            let ts = Number(bytes.readBigInt64LE(i)); i += 8;
+            let ts = Number(bytes.readInt32LE(i)); i += 4;
             const ph = ts > 0 ? 'B' : 'E';
             ts = ts > 0 ? ts : -ts;
             const event = { ph, tid, pid, addr, ts: ts };
