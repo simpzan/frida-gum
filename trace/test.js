@@ -55,8 +55,8 @@ class Tracer {
         const libtracePath = 'libtrace.so';
         this.attachCallbacks = loadLibTrace(libtracePath, onTraceEvent);
     }
-    traceFunctions(functionAddresses) {
-        functionAddresses.forEach((fn, index) => {
+    traceFunctions(functions) {
+        functions.forEach((fn, index) => {
             const addr = new NativePointer(fn.addr);
             const functionId = new NativePointer(index);
             try {
@@ -65,7 +65,7 @@ class Tracer {
                 log(`attach failed, ${error}. ${fn}`);
             }
         });
-        log(`tracing ${functionAddresses.length} function addresses.`);
+        log(`tracing ${functions.length} function addresses.`);
     }
     exit() {
         Interceptor.detachAll();
@@ -92,9 +92,9 @@ rpc.exports = {
         log(`${pid} ${libName} ${functions.length} functions`);
         return functions;
     },
-    startTracing(functionAddresses) {
+    startTracing(functions) {
         log(`startTracing`)
-        tracer.traceFunctions(functionAddresses);
+        tracer.traceFunctions(functions);
     },
     stopTracing() {
         tracer.exit();
