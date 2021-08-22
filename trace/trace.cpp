@@ -70,10 +70,10 @@ typedef void (*sendDataFn)(const uint8_t *bytes, int length, int mode);
 sendDataFn _sendDataFn = NULL;
 
 typedef struct __attribute__((__packed__)) Event_ {
-  uint64_t fn;
+  uint16_t fn;
   gint64 ts;
 } Event;
-static_assert (sizeof(Event) == 16, "Size is not correct");
+static_assert (sizeof(Event) == 10, "Size is not correct");
 
 std::mutex buffersMutex;
 struct EventBuffer;
@@ -97,7 +97,7 @@ struct EventBuffer {
   }
   void write(gpointer fn, int64_t ts) {
     auto event = events + current;
-    event->fn = GPOINTER_TO_SIZE(fn);
+    event->fn = (uint16_t)GPOINTER_TO_SIZE(fn);
     event->ts = ts;
     ++current;
     if (current == count) flush();

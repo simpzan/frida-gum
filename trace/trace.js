@@ -19,7 +19,7 @@ function onMessageFromDebuggee(msg, bytes) {
             return log.i(`thread ${id} ${name}`);
         }
         for (let i = 0; i < bytes.length; ) {
-            const addr = Number(bytes.readBigUInt64LE(i)); i += 8;
+            const addr = Number(bytes.readUInt16LE(i)); i += 2;
             let ts = Number(bytes.readBigInt64LE(i)); i += 8;
             const ph = ts > 0 ? 'B' : 'E';
             ts = ts > 0 ? ts : -ts;
@@ -136,6 +136,9 @@ async function getFunctionsToTrace(rpc, libName, srclinePrefix) {
     }
     const modules = ['/system/lib64/libGLESv2.so', '/system/lib64/libEGL.so'];
     await addImportedFunctions(rpc, libName, modules, functionsToTrace);
+    if (functionsToTrace.length > Math.pow(2, 16)) {
+        log.e(`too many functions for uint16_t, ${functionsToTrace.length}`);
+    }
     return functionsToTrace;
 }
 
