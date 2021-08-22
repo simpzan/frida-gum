@@ -89,6 +89,27 @@ function isRunning(program) {
     return out && out.length;
 }
 
+async function addImportedFunctions(rpc, libName, modules, functions) {
+    const imported = await rpc.getImportedFunctions(libName);
+    const symbolsByModule = new Map();
+    for (const symbol of imported) {
+        const symbols = symbolsByModule.get(symbol.module) || [];
+        symbols.push(symbol);
+        symbolsByModule.set(symbol.module, symbols);
+    }
+    for (const [module, symbols] of symbolsByModule) {
+        log.v(`imported ${symbols.length} symbols from ${module}`);
+        if (!modules.includes(module)) continue;
+
+        for (const symbol of symbols) {
+            if (symbol.type != 'function') continue;
+            const addr = parseInt(symbol.address, 16);
+            functions.set(addr, symbol);
+        }
+        log.i(`added ${symbols.length} symbols from ${module}`);
+    }
+}
+
 async function getFunctionsToTrace(rpc, libName, srclinePrefix) {
     const module = await rpc.getModuleByName(libName);
     log.i(module);
@@ -110,6 +131,8 @@ async function getFunctionsToTrace(rpc, libName, srclinePrefix) {
         fn.line = info.line;
         functionsToTrace.set(addr, fn);
     }
+    const modules = ['/system/lib64/libGLESv2.so', '/system/lib64/libEGL.so'];
+    await addImportedFunctions(rpc, libName, modules, functionsToTrace);
     return functionsToTrace;
 }
 
