@@ -50,7 +50,7 @@ function writeChromeTracingFile(filename, functionMap) {
     log.i(`writing chrome tracing file ${filename}`);
     const traceFile = new ChromeTracingFile(filename);
     for (const trace of events) {
-        const fn = functionMap.get(trace.addr);
+        const fn = functionMap[trace.addr]
         if (!fn) return log.e(`can't find function info for event: ${trace}`);
         trace.name = fn.demangledName || fn.name;
         traceFile.writeObject(trace);
@@ -104,7 +104,8 @@ async function addImportedFunctions(rpc, libName, modules, functions) {
         for (const symbol of symbols) {
             if (symbol.type != 'function') continue;
             const addr = parseInt(symbol.address, 16);
-            functions.set(addr, symbol);
+            symbol.addr = addr;
+            functions.push(symbol);
         }
         log.i(`added ${symbols.length} symbols from ${module}`);
     }
@@ -122,7 +123,7 @@ async function getFunctionsToTrace(rpc, libName, srclinePrefix) {
         return log.e(`build id mismatch ${buildIdLocal} ${buildIdRemote}`);
     }
     let functions = srclineReader.getFunctions();
-    const functionsToTrace = new Map()
+    const functionsToTrace = [];
     for (const fn of functions) {
         if (fn.name.includes('~')) continue;
         const info = srclineReader.srcline(fn.addr);
@@ -130,7 +131,8 @@ async function getFunctionsToTrace(rpc, libName, srclinePrefix) {
         fn.file = info.file;
         fn.line = info.line;
         const addr = fn.addr - vaddr + baseAddr;
-        functionsToTrace.set(addr, fn);
+        fn.addr = addr;
+        functionsToTrace.push(fn);
     }
     const modules = ['/system/lib64/libGLESv2.so', '/system/lib64/libEGL.so'];
     await addImportedFunctions(rpc, libName, modules, functionsToTrace);
@@ -155,7 +157,7 @@ async function main() {
     const script = await attachProcess(deviceId, processName, sourceFilename);
 
     const functionsToTrace = await getFunctionsToTrace(script.exports, libName, srclinePrefix);
-    await script.exports.startTracing([...functionsToTrace.keys()]);
+    await script.exports.startTracing(functionsToTrace);
 
     if (pid) await frida.resume(pid);
 

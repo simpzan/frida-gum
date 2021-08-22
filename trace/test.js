@@ -56,14 +56,16 @@ class Tracer {
         this.attachCallbacks = loadLibTrace(libtracePath, onTraceEvent);
     }
     traceFunctions(functionAddresses) {
-        for (const fn of functionAddresses) {
-            const addr = new NativePointer(fn);
+        functionAddresses.forEach((fn, index) => {
+            const addr = new NativePointer(fn.addr);
+            const functionId = new NativePointer(index);
             try {
-                Interceptor.attach(addr, this.attachCallbacks, addr);
+                Interceptor.attach(addr, this.attachCallbacks, functionId);
             } catch (error) {
-                log(`attach failed, ${error}. ${DebugSymbol.fromAddress(addr)}`);
+                log(`attach failed, ${error}. ${fn}`);
             }
-        }
+        });
+        log(`tracing ${functionAddresses.length} function addresses.`);
     }
     exit() {
         Interceptor.detachAll();
