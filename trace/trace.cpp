@@ -69,10 +69,11 @@ std::string getThreadName(uint32_t tid) {
 typedef void (*sendDataFn)(const uint8_t *bytes, int length, int mode);
 sendDataFn _sendDataFn = NULL;
 
-typedef struct Event_ {
+typedef struct __attribute__((__packed__)) Event_ {
   uint64_t fn;
   gint64 ts;
 } Event;
+static_assert (sizeof(Event) == 16, "Size is not correct");
 
 std::mutex buffersMutex;
 struct EventBuffer;
