@@ -243,26 +243,26 @@ public:
   }
   std::pair<std::string, int> srcline(const char *addr) {
     using namespace dwarf;
-    dwarf::taddr pc = stoll(addr, nullptr, 0);
+    taddr pc = stoll(addr, nullptr, 0);
     auto die = functions[pc];
     if (!die.valid()) return {};
 
     auto &cu = (compilation_unit &) die.get_unit();
 
-    auto decl_file_value = die.resolve(dwarf::DW_AT::decl_file);
+    auto decl_file_value = die.resolve(DW_AT::decl_file);
     if (decl_file_value.valid()) {
       auto decl_file = decl_file_value.as_uconstant();
       auto lt = cu.get_line_table();
       if (decl_file == 0) return {};
 
       auto file = lt.get_file(decl_file);
-      auto line = die.resolve(dwarf::DW_AT::decl_line).as_uconstant();
+      auto line = die.resolve(DW_AT::decl_line).as_uconstant();
       // return file->path;
       return {file->path, line};
     }
 
-    if (die.has(dwarf::DW_AT::artificial) && die[dwarf::DW_AT::artificial].as_flag()) {
-      return {to_string(cu.root()[dwarf::DW_AT::name]), -1};
+    if (die.has(DW_AT::artificial) && die[DW_AT::artificial].as_flag()) {
+      return {to_string(cu.root()[DW_AT::name]), -1};
     }
     return {};
   }
