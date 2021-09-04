@@ -350,6 +350,8 @@ void getFunctions(const FunctionCallbackInfo<Value> &args) {
     obj->Set(context, String::NewFromUtf8(isolate, "addr").ToLocalChecked(), addr);
     auto name = String::NewFromUtf8(isolate, getName(entry.second).c_str()).ToLocalChecked();
     obj->Set(context, String::NewFromUtf8(isolate, "name").ToLocalChecked(), name);
+    Local<Number> size = Number::New(isolate, at_high_pc(entry.second) - entry.first);
+    obj->Set(context, String::NewFromUtf8(isolate, "size").ToLocalChecked(), size);
     myArray->Set(context, i, obj);
     ++i;
   }
