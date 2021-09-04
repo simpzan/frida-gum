@@ -3,7 +3,9 @@ const utils = require('./utils.js');
 // const CppDemangler = require('./CppDemangler.js');
 const CppDemangler = require('./CppDemangler.node');
 log("cwd", process.cwd())
-const frida = require('../../build/frida_thin-linux-x86_64/lib/node_modules/frida');
+const fridaMac = '../../build/frida-macos-x86_64/lib/node_modules/frida';
+const fridaLinux = '../../build/frida_thin-linux-x86_64/lib/node_modules/frida';
+const frida = require(fridaMac);
 
 let threadNames = new Map();
 let events = [];
