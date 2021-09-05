@@ -79,6 +79,7 @@ const tracer = new Tracer();
 rpc.exports = {
     getBuidId(path) { return getBuidId(path); },
     getModuleByName(libName) {
+        Module.load(libName);
         return Process.getModuleByName(libName);
     },
     getImportedFunctions(libName) { return Module.enumerateImportsSync(libName); },
