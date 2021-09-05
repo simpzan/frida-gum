@@ -154,6 +154,19 @@ std::vector<uint8_t> getBuidId(const elf::elf &f) {
   return id;
 }
 
+
+std::map<uint64_t, std::string> getFunctionAddress(const elf::elf &f, elf::sht type) {
+  std::map<uint64_t, std::string> functions;
+  for (auto &sec : f.sections()) {
+    if (sec.get_hdr().type != type) continue;
+    for (auto sym : sec.as_symtab()) {
+      auto &d = sym.get_data();
+      if (d.type() == elf::stt::func && d.size > 0) functions[d.value] = sym.get_name();
+    }
+  }
+  return functions;
+}
+
 int64_t getVirtualAddress(const elf::elf &ef) {
   using namespace elf;
   for (auto &seg : ef.segments()) {
@@ -215,6 +228,10 @@ class SourceLineReader {
 public:
   std::map<uint64_t, dwarf::die> functions;
   uint64_t getVirtualAddress() { return vaddr; }
+  std::map<uint64_t, std::string> getSymbolTable(elf::sht type) {
+    return getFunctionAddress(*ef, type);
+  }
+
   void init(const char *file) {
     int fd = open(file, O_RDONLY);
     if (fd < 0) {
@@ -357,6 +374,24 @@ void getFunctions(const FunctionCallbackInfo<Value> &args) {
   }
   args.GetReturnValue().Set(myArray);
 }
+void getSymbolTable(const FunctionCallbackInfo<Value> &args) {
+  Isolate* isolate = args.GetIsolate();
+  int value = args[0].As<Number>()->Value();
+  auto type = value ? elf::sht::dynsym : elf::sht::symtab;
+  Local<Context> context = isolate->GetCurrentContext();
+  Local<Array> myArray = Array::New(isolate);
+  int i = 0;
+  for (auto &entry: srclineReader.getSymbolTable(type)) {
+    Local<Object> obj = Object::New(isolate);
+    Local<Number> addr = Number::New(isolate, entry.first);
+    obj->Set(context, String::NewFromUtf8(isolate, "addr").ToLocalChecked(), addr);
+    auto name = String::NewFromUtf8(isolate, entry.second.c_str()).ToLocalChecked();
+    obj->Set(context, String::NewFromUtf8(isolate, "name").ToLocalChecked(), name);
+    myArray->Set(context, i, obj);
+    ++i;
+  }
+  args.GetReturnValue().Set(myArray);
+}
 void Init(v8::Local<v8::Object> exports, v8::Local<v8::Value>, void*) {
   NODE_SET_METHOD(exports, "demangle", demangle);
   NODE_SET_METHOD(exports, "srcline", srcline);
@@ -365,6 +400,7 @@ void Init(v8::Local<v8::Object> exports, v8::Local<v8::Value>, void*) {
   NODE_SET_METHOD(exports, "getVirtualAddress", getVirtualAddress);
   NODE_SET_METHOD(exports, "getBuidId", getBuidId);
   NODE_SET_METHOD(exports, "getFunctions", getFunctions);
+  NODE_SET_METHOD(exports, "getSymbolTable", getSymbolTable);
 }
 
 NODE_MODULE(addon, Init)
