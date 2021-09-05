@@ -208,6 +208,12 @@ class SourceLineReader {
     auto addr = at_low_pc(die);
     if (addr == 0) return;
 
+    addr = getSymbolAddr(addr);
+    if (addr == 0) {
+      dump_die(die);
+      return;
+    }
+
     auto found = functions[addr];
     if (!found.valid()) {
       functions[addr] = die;
@@ -219,8 +225,28 @@ class SourceLineReader {
     }
   }
   void loadFunctionInfo() {
+    isArm32 = ef->get_hdr().machine == EM_ARM;
+    INFO("isArm32 %d", isArm32);
+    functionSymbols = getFunctionAddress(*ef, elf::sht::symtab);
     for (auto &cu: cus) loadDieR(cu.root());
+    functionSymbols.clear();
   }
+  std::map<uint64_t, std::string> functionSymbols;
+  uint64_t getSymbolAddr(uint64_t addr) {
+    if (!isArm32) return addr;
+    auto itr = functionSymbols.find(addr);
+    if (itr != functionSymbols.end()) return addr;
+    addr += 1;
+    itr = functionSymbols.find(addr);
+    if (itr != functionSymbols.end()) return addr;
+    ERROR("invalid addr %lx", addr);
+    return 0;
+  }
+  enum elfmachine {
+    EM_AARCH64  = 183,
+    EM_ARM      = 40,
+  };
+  bool isArm32 = false;
   elf::elf *ef = nullptr;
   dwarf::dwarf *dw = nullptr;
   std::vector<dwarf::compilation_unit> cus;
