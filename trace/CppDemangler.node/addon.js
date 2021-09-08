@@ -17,8 +17,7 @@ class SourceLineFinder {
         addon.startDwarf(libName);
     }
     srcline(addr) {
-        const addrString = '0x' + addr.toString(16);
-        return addon.srcline(addrString);
+        return addon.srcline(addr);
     }
     getVirtualAddress() {
         return addon.getVirtualAddress();

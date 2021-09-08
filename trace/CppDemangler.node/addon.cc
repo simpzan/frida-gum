@@ -284,10 +284,9 @@ public:
     INFO("build id %s", id.c_str());
     return id;
   }
-  std::pair<std::string, int> srcline(const char *addr) {
+  std::pair<std::string, int> srcline(uint64_t addr) {
     using namespace dwarf;
-    taddr pc = stoll(addr, nullptr, 0);
-    auto die = functions[pc];
+    auto die = functions[addr];
     if (!die.valid()) return {};
 
     auto &cu = (compilation_unit &) die.get_unit();
@@ -324,17 +323,11 @@ void srcline(const FunctionCallbackInfo<Value> &args) {
     return;
   }
 
-  // Check the argument types
-  if (!args[0]->IsString()) {
-    isolate->ThrowException(Exception::TypeError(
-        String::NewFromUtf8(isolate, "Wrong arguments").ToLocalChecked()));
-    return;
-  }
-
+  uint64_t pc = args[0].As<Number>()->Value();
+  // INFO("%lx", pc);
   std::pair<std::string, int> res;
   try {
-    v8::String::Utf8Value str1(isolate, args[0]);
-    res = srclineReader.srcline(*str1);
+    res = srclineReader.srcline(pc);
   } catch(const std::exception& e) {
     std::cerr << e.what() << '\n';
   }
