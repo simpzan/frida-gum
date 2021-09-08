@@ -342,8 +342,8 @@ void srcline(const FunctionCallbackInfo<Value> &args) {
   Local<Object> obj = Object::New(isolate);
   auto file = String::NewFromUtf8(isolate, res.first.c_str()).ToLocalChecked();
   auto line = Number::New(isolate, res.second);
-  obj->Set(context, String::NewFromUtf8(isolate, "file").ToLocalChecked(), file);
-  obj->Set(context, String::NewFromUtf8(isolate, "line").ToLocalChecked(), line);
+  obj->Set(context, String::NewFromUtf8(isolate, "file").ToLocalChecked(), file).FromJust();
+  obj->Set(context, String::NewFromUtf8(isolate, "line").ToLocalChecked(), line).FromJust();
   args.GetReturnValue().Set(obj);
 }
 void startDwarf(const FunctionCallbackInfo<Value> &args) {
@@ -391,12 +391,12 @@ void getFunctions(const FunctionCallbackInfo<Value> &args) {
     Local<Object> obj = Object::New(isolate);
     Local<Number> addr = Number::New(isolate, entry.first);
     auto die = entry.second;
-    obj->Set(context, String::NewFromUtf8(isolate, "addr").ToLocalChecked(), addr);
+    obj->Set(context, String::NewFromUtf8(isolate, "addr").ToLocalChecked(), addr).FromJust();
     auto name = String::NewFromUtf8(isolate, getName(die).c_str()).ToLocalChecked();
-    obj->Set(context, String::NewFromUtf8(isolate, "name").ToLocalChecked(), name);
+    obj->Set(context, String::NewFromUtf8(isolate, "name").ToLocalChecked(), name).FromJust();
     Local<Number> size = Number::New(isolate, at_high_pc(die) - at_low_pc(die));
-    obj->Set(context, String::NewFromUtf8(isolate, "size").ToLocalChecked(), size);
-    myArray->Set(context, i, obj);
+    obj->Set(context, String::NewFromUtf8(isolate, "size").ToLocalChecked(), size).FromJust();
+    myArray->Set(context, i, obj).FromJust();
     ++i;
   }
   args.GetReturnValue().Set(myArray);
@@ -411,10 +411,10 @@ void getSymbolTable(const FunctionCallbackInfo<Value> &args) {
   for (auto &entry: srclineReader.getSymbolTable(type)) {
     Local<Object> obj = Object::New(isolate);
     Local<Number> addr = Number::New(isolate, entry.first);
-    obj->Set(context, String::NewFromUtf8(isolate, "addr").ToLocalChecked(), addr);
+    obj->Set(context, String::NewFromUtf8(isolate, "addr").ToLocalChecked(), addr).FromJust();
     auto name = String::NewFromUtf8(isolate, entry.second.c_str()).ToLocalChecked();
-    obj->Set(context, String::NewFromUtf8(isolate, "name").ToLocalChecked(), name);
-    myArray->Set(context, i, obj);
+    obj->Set(context, String::NewFromUtf8(isolate, "name").ToLocalChecked(), name).FromJust();
+    myArray->Set(context, i, obj).FromJust();
     ++i;
   }
   args.GetReturnValue().Set(myArray);
