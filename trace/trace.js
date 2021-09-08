@@ -113,6 +113,22 @@ async function addImportedFunctions(rpc, libName, modules, functions) {
     }
 }
 
+function validateFunctions(functionsLocal, functionsRemote) {
+    const remoteFunctions = new Map();
+    for (const fn of functionsRemote) {
+        const addr = parseInt(fn.address, 16);
+        remoteFunctions.set(addr, fn);
+    }
+    for (const fn of functionsLocal) {
+        const remote = remoteFunctions.get(fn.addr);
+        if (!remote) {
+            log.e('invalid function', fn);
+            return false;
+        }
+        if (remote.size != fn.size) log.e('invalid function size', fn, remote);
+    }
+    return true;
+}
 async function getFunctionsToTrace(rpc, libName, srclinePrefix) {
     const module = await rpc.getModuleByName(libName);
     log.i(module);
@@ -141,6 +157,8 @@ async function getFunctionsToTrace(rpc, libName, srclinePrefix) {
     if (functionsToTrace.length > Math.pow(2, 16)) {
         log.e(`too many functions for uint16_t, ${functionsToTrace.length}`);
     }
+    const remoteFunctions = await rpc.getFunctionsOfModule(libName);
+    validateFunctions(functionsToTrace, remoteFunctions);
     return functionsToTrace;
 }
 
