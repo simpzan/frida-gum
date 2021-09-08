@@ -390,10 +390,11 @@ void getFunctions(const FunctionCallbackInfo<Value> &args) {
   for (auto &entry: srclineReader.functions) {
     Local<Object> obj = Object::New(isolate);
     Local<Number> addr = Number::New(isolate, entry.first);
+    auto die = entry.second;
     obj->Set(context, String::NewFromUtf8(isolate, "addr").ToLocalChecked(), addr);
-    auto name = String::NewFromUtf8(isolate, getName(entry.second).c_str()).ToLocalChecked();
+    auto name = String::NewFromUtf8(isolate, getName(die).c_str()).ToLocalChecked();
     obj->Set(context, String::NewFromUtf8(isolate, "name").ToLocalChecked(), name);
-    Local<Number> size = Number::New(isolate, at_high_pc(entry.second) - entry.first);
+    Local<Number> size = Number::New(isolate, at_high_pc(die) - at_low_pc(die));
     obj->Set(context, String::NewFromUtf8(isolate, "size").ToLocalChecked(), size);
     myArray->Set(context, i, obj);
     ++i;
