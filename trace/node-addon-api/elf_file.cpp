@@ -76,13 +76,13 @@ std::vector<FunctionSymbol> getFunctionSymbols(const elf::elf &f, elf::sht type)
 class ELF {
  public:
   static unique_ptr<ELF> create(const char *file) {
-    int fd = open(file, O_RDONLY);
-    if (fd < 0) {
+    unique_fd fd(open(file, O_RDONLY));
+    if (fd.get() == -1) {
       ERRNO("open('%s', readonly)", file);
       return nullptr;
     }
 
-    auto ef = make_unique<elf::elf>(elf::create_mmap_loader(fd));
+    auto ef = make_unique<elf::elf>(elf::create_mmap_loader(fd.get()));
     auto dw = make_unique<dwarf::dwarf>(dwarf::elf::create_loader(*ef));
     if (!(ef && dw)) {
       LOGE("ef %p, dw %p", ef.get(), dw.get());
@@ -90,6 +90,7 @@ class ELF {
     }
     auto ret = make_unique<ELF>();
     ret->path_ = file;
+    ret->fd_ = move(fd);
     ret->arch_ = (Arch)ef->get_hdr().machine;
     ret->ef_ = move(ef);
     ret->dw_ = move(dw);
@@ -112,6 +113,7 @@ class ELF {
 
  private:
   string path_;
+  unique_fd fd_;
   unique_ptr<elf::elf> ef_;
   unique_ptr<dwarf::dwarf> dw_;
   Arch arch_;
