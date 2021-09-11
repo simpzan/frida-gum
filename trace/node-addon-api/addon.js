@@ -15,4 +15,5 @@ console.log( obj === newobj ); // false
 const log = console.log.bind(console);
 const libuiFile = '~/blueline/aosp_9_r12/out/target/product/generic_arm64/symbols/system/lib/libui.so';
 const libui = new addon.ELFFile(libuiFile);
-log(libui.plusOne());
+const info = libui.info();
+log(info, info.vaddr.toString(16));

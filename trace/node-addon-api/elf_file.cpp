@@ -7,7 +7,7 @@ void ELFFile::Init(Napi::Env env, Napi::Object exports) {
   Napi::Function func =
       DefineClass(env,
                   "ELFFile",
-                  {InstanceMethod("plusOne", &ELFFile::PlusOne),
+                  {InstanceMethod("info", &ELFFile::info),
                    InstanceMethod("value", &ELFFile::GetValue),
                    InstanceMethod("multiply", &ELFFile::Multiply)});
 
@@ -41,10 +41,16 @@ Napi::Value ELFFile::GetValue(const Napi::CallbackInfo& info) {
   return Napi::Number::New(info.Env(), num);
 }
 
-Napi::Value ELFFile::PlusOne(const Napi::CallbackInfo& info) {
-  this->value_ = this->value_ + 1;
-
-  return ELFFile::GetValue(info);
+Napi::Value ELFFile::info(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  Napi::Object obj = Napi::Object::New(env);
+  auto arch = "arm";
+  auto buildid = "this is a build-id";
+  int vaddr = 0x1234;
+  obj.Set(Napi::String::New(env, "arch"), Napi::String::New(env, arch));
+  obj.Set(Napi::String::New(env, "buildid"), Napi::String::New(env, buildid));
+  obj.Set(Napi::String::New(env, "vaddr"), Napi::Number::New(env, vaddr));
+  return obj;
 }
 
 Napi::Value ELFFile::Multiply(const Napi::CallbackInfo& info) {
