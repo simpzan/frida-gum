@@ -129,33 +129,18 @@ string archString(ELF::Arch arch) {
   }
 }
 
-
-static std::string demangle(const char *mangled_name, bool quiet = true) {
+static std::string demangle(const char *mangled_name) {
   int status = 0;
-  const char *realname = abi::__cxa_demangle(mangled_name, 0, 0, &status);
-  std::string res;
-  switch (status) {
-  case 0:
-    res = realname;
-    break;
-  case -1:
-    LOGE("FAIL: failed to allocate memory while demangling %s", mangled_name);
-    break;
-  case -2:
-    // LOGE("FAIL: %s is not a valid name under the C++ ABI mangling rules", mangled_name);
-    res = mangled_name;
-    break;
-  default:
-    LOGE("FAIL: some other unexpected error: %d", status);
-    break;
-  }
-  free((void *)realname);
+  auto realname = abi::__cxa_demangle(mangled_name, 0, 0, &status);
+  if (status != 0) return mangled_name;
+  std::string res = realname;
+  free(realname);
   return res;
 }
 Napi::Value demangleCppName(const Napi::CallbackInfo& info) {
   Napi::Env env = info.Env();
-  Napi::String name = info[0].As<Napi::String>();
-  auto demangled = demangle(name.Utf8Value().c_str());
+  auto name = info[0].As<Napi::String>().Utf8Value();
+  auto demangled = demangle(name.c_str());
   // LOGI("name %s -> %s", name.Utf8Value().c_str(), demangled.c_str());
   return Napi::String::New(env, demangled);
 }
