@@ -1,0 +1,17 @@
+#pragma once
+
+#include <napi.h>
+
+class ELFFile : public Napi::ObjectWrap<ELFFile> {
+ public:
+  static void Init(Napi::Env env, Napi::Object exports);
+  ELFFile(const Napi::CallbackInfo& info);
+
+ private:
+  Napi::Value GetValue(const Napi::CallbackInfo& info);
+  Napi::Value PlusOne(const Napi::CallbackInfo& info);
+  Napi::Value Multiply(const Napi::CallbackInfo& info);
+
+  double value_;
+};
+
