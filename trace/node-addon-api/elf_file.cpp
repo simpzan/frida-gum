@@ -1,6 +1,7 @@
 #include <string>
 #include <map>
 #include <vector>
+#include <inttypes.h>
 #include <cxxabi.h>
 #include "elf_file.h"
 #include "log.h"
@@ -117,6 +118,7 @@ class ELF {
   unique_ptr<elf::elf> ef_;
   unique_ptr<dwarf::dwarf> dw_;
   Arch arch_;
+  friend class DebugInfo;
 };
 
 string archString(ELF::Arch arch) {
@@ -140,8 +142,7 @@ static std::string demangle(const char *mangled_name, bool quiet = true) {
     LOGE("FAIL: failed to allocate memory while demangling %s", mangled_name);
     break;
   case -2:
-    // printf("FAIL: %s is not a valid name under the C++ ABI mangling rules\n",
-    //        mangled_name);
+    // LOGE("FAIL: %s is not a valid name under the C++ ABI mangling rules", mangled_name);
     res = mangled_name;
     break;
   default:
@@ -155,11 +156,92 @@ Napi::Value demangleCppName(const Napi::CallbackInfo& info) {
   Napi::Env env = info.Env();
   Napi::String name = info[0].As<Napi::String>();
   auto demangled = demangle(name.Utf8Value().c_str());
-  LOGI("name %s -> %s", name.Utf8Value().c_str(), demangled.c_str());
+  // LOGI("name %s -> %s", name.Utf8Value().c_str(), demangled.c_str());
   return Napi::String::New(env, demangled);
 }
 
+string getName(const dwarf::die &die) {
+  auto value = die.resolve(dwarf::DW_AT::linkage_name);
+  if (!value.valid()) value = die.resolve(dwarf::DW_AT::name);
+  if (!value.valid()) return "";
+  return demangle(value.as_string().c_str());
+}
+bool sameDie(const dwarf::die &die1, const dwarf::die &die2) {
+  auto name1 = getName(die1);
+  auto name2 = getName(die2);
+  auto result = name1 == name2;
+  // if (!result) LOGI("%s %s %d", name1.c_str(), name2.c_str(), result);
+  return result;
+}
+void dump_die(const dwarf::die &node, bool show = false) {
+  LOGD("<%" PRIx64 "> %s", node.get_section_offset(), to_string(node.tag).c_str());
+  auto attributes = node.attributes();
+  int i = 0, total = attributes.size();
+  for (auto &attr : attributes) {
+    auto key = to_string(attr.first);
+    auto value = to_string(attr.second);
+    LOGD("%d/%d %s %s", ++i, total, key.c_str(), value.c_str());
+  }
+}
+string decl_file(const dwarf::die &die) {
+  using namespace dwarf;
+  auto &cu = (compilation_unit &) die.get_unit();
+  auto decl_file_value = die.resolve(DW_AT::decl_file);
+  if (decl_file_value.valid()) {
+    auto decl_file = decl_file_value.as_uconstant();
+    if (decl_file == 0) return "";
 
+    auto lt = cu.get_line_table();
+    auto file = lt.get_file(decl_file);
+    return file->path;
+  }
+
+  if (die.has(DW_AT::artificial) && die[DW_AT::artificial].as_flag()) {
+    return to_string(cu.root()[DW_AT::name]);
+  }
+  return "";
+}
+int decl_line(const dwarf::die &die) {
+  auto line = die.resolve(dwarf::DW_AT::decl_line).as_uconstant();
+  return line;
+}
+class DebugInfo {
+  void loadDieR(const dwarf::die &die) {
+    using namespace dwarf;
+    for (auto &child : die) loadDieR(child);
+    if (die.tag != DW_TAG::subprogram) return;
+    if (!die.has(DW_AT::low_pc)) return;
+
+    auto addr = at_low_pc(die);
+    if (addr == 0) {
+      LOGI("low_pc is 0");
+      dump_die(die);
+      return;
+    }
+
+    auto found = dies[addr];
+    if (!found.valid()) {
+      dies[addr] = die;
+    } else if (!sameDie(found, die)) {
+      conflictedDies.push_back(die);
+    }
+  }
+ public:
+  DebugInfo(const ELF &elf): elf_(elf) {
+    auto cus = elf.dw_->compilation_units();
+    for (auto &cu: cus) loadDieR(cu.root());
+    LOGI("indexed %d dies, conflicts %d", (int)dies.size(), (int)conflictedDies.size());
+  }
+  const dwarf::die die(uint64_t addr) const {
+    auto itr = dies.find(addr);
+    if (itr != dies.end()) return itr->second;
+    return dwarf::die();
+  }
+ private:
+  const ELF &elf_;
+  std::map<uint64_t, dwarf::die> dies;
+  vector<dwarf::die> conflictedDies;
+};
 class DebugInfoWrap : public Napi::ObjectWrap<DebugInfoWrap> {
  public:
   static void Init(Napi::Env env, Napi::Object exports) {
@@ -173,23 +255,28 @@ class DebugInfoWrap : public Napi::ObjectWrap<DebugInfoWrap> {
     : Napi::ObjectWrap<DebugInfoWrap>(info) {
     auto obj = info[0].As<Napi::Object>();
     ELFWrap* ef = Napi::ObjectWrap<ELFWrap>::Unwrap(obj);
-    LOGI("elf %p", ef);
+    debugInfo_ = make_unique<DebugInfo>(*ef->elf_);
   }
  private:
+  unique_ptr<DebugInfo> debugInfo_;
   Napi::Value srcline(const Napi::CallbackInfo& info) {
     uint64_t addr = info[0].As<Napi::Number>().Int64Value();
-    LOGI("addr %lx", addr);
+    auto die = debugInfo_->die(addr);
+    if (!die.valid()) die = debugInfo_->die(addr - 1);
 
     Napi::Env env = info.Env();
     Napi::Object obj = Napi::Object::New(env);
-    auto src = "test.cpp";
-    auto line = 23;
+    if (!die.valid()) return obj;
+
+    auto src = decl_file(die);
+    auto line = decl_line(die);
     obj.Set(Napi::String::New(env, "src"), Napi::String::New(env, src));
     obj.Set(Napi::String::New(env, "line"), Napi::Number::New(env, line));
     return obj;
   }
   Napi::Value release(const Napi::CallbackInfo& info) {
     TRACE();
+    debugInfo_.reset();
     Napi::Env env = info.Env();
     return env.Null();
   }

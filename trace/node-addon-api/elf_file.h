@@ -4,6 +4,7 @@
 #include <napi.h>
 
 class ELF;
+class DebugInfoWrap;
 class ELFWrap : public Napi::ObjectWrap<ELFWrap> {
  public:
   static void Init(Napi::Env env, Napi::Object exports);
@@ -14,5 +15,6 @@ class ELFWrap : public Napi::ObjectWrap<ELFWrap> {
   Napi::Value info(const Napi::CallbackInfo& info);
 
   std::unique_ptr<ELF> elf_;
+  friend class DebugInfoWrap;
 };
 
