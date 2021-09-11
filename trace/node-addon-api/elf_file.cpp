@@ -7,8 +7,38 @@
 #include <fcntl.h>
 #include "elf/elf++.hh"
 #include "dwarf/dwarf++.hh"
+#include "utils.h"
 
 using namespace std;
+
+
+typedef struct {
+    uint32_t namesz;
+    uint32_t descsz;
+    uint32_t type;
+    uint8_t data[];
+} ElfNoteSection_t;
+#ifndef NT_GNU_BUILD_ID
+# define NT_GNU_BUILD_ID 3
+#endif
+std::vector<uint8_t> get_build_id(const elf::section &section) {
+  ElfNoteSection_t *nhdr = (ElfNoteSection_t *)section.data();
+  if (nhdr->type != NT_GNU_BUILD_ID) return {};
+  if (strcmp((char *)nhdr->data, "GNU")) return {};
+  const uint8_t *bytes = nhdr->data + nhdr->namesz;
+  std::vector<uint8_t> id(bytes, bytes + nhdr->descsz);
+  return id;
+}
+std::vector<uint8_t> getBuildId(const elf::elf &f) {
+  std::vector<uint8_t> id;
+  for (auto &sec : f.sections()) {
+    if (sec.get_name() == ".note.gnu.build-id") {
+      id = get_build_id(sec);
+      break;
+    }
+  }
+  return id;
+}
 
 class ELF {
  public:
@@ -38,6 +68,8 @@ class ELF {
     arm64 = 183,
   };
   Arch arch() const { return arch_; }
+  vector<uint8_t> buildId() { return getBuildId(*ef_); }
+
  private:
   string path_;
   unique_ptr<elf::elf> ef_;
@@ -98,7 +130,7 @@ Napi::Value ELFFile::info(const Napi::CallbackInfo& info) {
   Napi::Env env = info.Env();
   Napi::Object obj = Napi::Object::New(env);
   auto arch = archString(elf_->arch());
-  auto buildid = "this is a build-id";
+  auto buildid = bytes_to_hex_string(elf_->buildId());
   int vaddr = 0x1234;
   obj.Set(Napi::String::New(env, "arch"), Napi::String::New(env, arch));
   obj.Set(Napi::String::New(env, "buildid"), Napi::String::New(env, buildid));

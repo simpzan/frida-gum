@@ -4,7 +4,7 @@
       "target_name": "addon",
       "cflags!": [ "-fno-exceptions" ],
       "cflags_cc!": [ "-fno-exceptions" ],
-      "sources": [ "addon.cc", "myobject.cc", "elf_file.cpp" ],
+      "sources": [ "addon.cc", "myobject.cc", "elf_file.cpp", "utils.cpp" ],
       "libraries": [
         "<!(pwd)/../libelfin/dwarf/libdwarf++.a",
         "<!(pwd)/../libelfin/elf/libelf++.a"
