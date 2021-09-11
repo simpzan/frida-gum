@@ -172,7 +172,7 @@ class DebugInfoWrap : public Napi::ObjectWrap<DebugInfoWrap> {
   DebugInfoWrap(const Napi::CallbackInfo& info)
     : Napi::ObjectWrap<DebugInfoWrap>(info) {
     auto obj = info[0].As<Napi::Object>();
-    ELFFile* ef = Napi::ObjectWrap<ELFFile>::Unwrap(obj);
+    ELFWrap* ef = Napi::ObjectWrap<ELFWrap>::Unwrap(obj);
     LOGI("elf %p", ef);
   }
  private:
@@ -195,20 +195,20 @@ class DebugInfoWrap : public Napi::ObjectWrap<DebugInfoWrap> {
   }
 };
 
-void ELFFile::Init(Napi::Env env, Napi::Object exports) {
+void ELFWrap::Init(Napi::Env env, Napi::Object exports) {
   auto methods = {
-    InstanceMethod("info", &ELFFile::info),
-    InstanceMethod("functions", &ELFFile::functions),
-    // InstanceMethod("release", &ELFFile::release),
+    InstanceMethod("info", &ELFWrap::info),
+    InstanceMethod("functions", &ELFWrap::functions),
+    // InstanceMethod("release", &ELFWrap::release),
   };
-  Napi::Function func = DefineClass(env, "ELFFile", methods);
-  exports.Set("ELFFile", func);
+  Napi::Function func = DefineClass(env, "ELFWrap", methods);
+  exports.Set("ELFWrap", func);
   exports.Set(Napi::String::New(env, "demangleCppName"), Napi::Function::New(env, demangleCppName));
   DebugInfoWrap::Init(env, exports);
 }
 
-ELFFile::ELFFile(const Napi::CallbackInfo& info)
-    : Napi::ObjectWrap<ELFFile>(info) {
+ELFWrap::ELFWrap(const Napi::CallbackInfo& info)
+    : Napi::ObjectWrap<ELFWrap>(info) {
   TRACE();
   Napi::Env env = info.Env();
 
@@ -224,7 +224,7 @@ ELFFile::ELFFile(const Napi::CallbackInfo& info)
   elf_ = ELF::create(path.Utf8Value().c_str());
 }
 
-Napi::Value ELFFile::functions(const Napi::CallbackInfo& info) {
+Napi::Value ELFWrap::functions(const Napi::CallbackInfo& info) {
   auto functions = elf_->functionSymbols();
   int count = functions.size();
   LOGI("count %d", count);
@@ -242,7 +242,7 @@ Napi::Value ELFFile::functions(const Napi::CallbackInfo& info) {
   return result;
 }
 
-Napi::Value ELFFile::info(const Napi::CallbackInfo& info) {
+Napi::Value ELFWrap::info(const Napi::CallbackInfo& info) {
   Napi::Env env = info.Env();
   Napi::Object obj = Napi::Object::New(env);
   auto arch = archString(elf_->arch());

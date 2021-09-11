@@ -14,7 +14,7 @@ console.log( obj === newobj ); // false
 
 const log = console.log.bind(console);
 function showBinaryInfo(file) {
-    let lib = new addon.ELFFile(file);
+    let lib = new addon.ELFWrap(file);
     const info = lib.info();
     log(info, info.vaddr.toString(16));
     const functions = lib.functions();

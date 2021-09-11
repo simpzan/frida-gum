@@ -4,10 +4,10 @@
 #include <napi.h>
 
 class ELF;
-class ELFFile : public Napi::ObjectWrap<ELFFile> {
+class ELFWrap : public Napi::ObjectWrap<ELFWrap> {
  public:
   static void Init(Napi::Env env, Napi::Object exports);
-  ELFFile(const Napi::CallbackInfo& info);
+  ELFWrap(const Napi::CallbackInfo& info);
 
  private:
   Napi::Value functions(const Napi::CallbackInfo& info);

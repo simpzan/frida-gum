@@ -4,7 +4,7 @@
 
 Napi::Object InitAll(Napi::Env env, Napi::Object exports) {
   MyObject::Init(env, exports);
-  ELFFile::Init(env, exports);
+  ELFWrap::Init(env, exports);
   return exports;
 }
 
