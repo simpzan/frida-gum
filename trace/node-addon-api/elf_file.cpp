@@ -1,6 +1,7 @@
 #include <string>
 #include <map>
 #include <vector>
+#include <cxxabi.h>
 #include "elf_file.h"
 #include "log.h"
 
@@ -124,6 +125,38 @@ string archString(ELF::Arch arch) {
   }
 }
 
+
+static std::string demangle(const char *mangled_name, bool quiet = true) {
+  int status = 0;
+  const char *realname = abi::__cxa_demangle(mangled_name, 0, 0, &status);
+  std::string res;
+  switch (status) {
+  case 0:
+    res = realname;
+    break;
+  case -1:
+    LOGE("FAIL: failed to allocate memory while demangling %s", mangled_name);
+    break;
+  case -2:
+    // printf("FAIL: %s is not a valid name under the C++ ABI mangling rules\n",
+    //        mangled_name);
+    res = mangled_name;
+    break;
+  default:
+    LOGE("FAIL: some other unexpected error: %d", status);
+    break;
+  }
+  free((void *)realname);
+  return res;
+}
+Napi::Value demangleCppName(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  Napi::String name = info[0].As<Napi::String>();
+  auto demangled = demangle(name.Utf8Value().c_str());
+  LOGI("name %s -> %s", name.Utf8Value().c_str(), demangled.c_str());
+  return Napi::String::New(env, demangled);
+}
+
 static Napi::FunctionReference* constructor = nullptr;
 
 void ELFFile::Init(Napi::Env env, Napi::Object exports) {
@@ -134,6 +167,7 @@ void ELFFile::Init(Napi::Env env, Napi::Object exports) {
   };
   Napi::Function func = DefineClass(env, "ELFFile", methods);
   exports.Set("ELFFile", func);
+  exports.Set(Napi::String::New(env, "demangleCppName"), Napi::Function::New(env, demangleCppName));
 
   constructor = new Napi::FunctionReference();
   *constructor = Napi::Persistent(func);
