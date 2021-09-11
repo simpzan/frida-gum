@@ -19,7 +19,7 @@ function showBinaryInfo(file) {
     log(info, info.vaddr.toString(16));
     const functions = lib.functions();
     log(functions.length);
-    const debugInfo = new addon.DebugInfo(lib);
+    const debugInfo = new addon.DebugInfoWrap(lib);
     functions.slice(0, 5).forEach((fn, index) => {
         log(index, fn, addon.demangleCppName(fn.name), debugInfo.srcline(fn.address));
     });

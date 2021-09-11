@@ -160,17 +160,17 @@ Napi::Value demangleCppName(const Napi::CallbackInfo& info) {
 }
 
 
-class DebugInfo : public Napi::ObjectWrap<DebugInfo> {
+class DebugInfoWrap : public Napi::ObjectWrap<DebugInfoWrap> {
  public:
   static void Init(Napi::Env env, Napi::Object exports) {
     auto methods = {
-      InstanceMethod("srcline", &DebugInfo::srcline),
-      InstanceMethod("release", &DebugInfo::release),
+      InstanceMethod("srcline", &DebugInfoWrap::srcline),
+      InstanceMethod("release", &DebugInfoWrap::release),
     };
-    exports.Set("DebugInfo", DefineClass(env, "DebugInfo", methods));
+    exports.Set("DebugInfoWrap", DefineClass(env, "DebugInfoWrap", methods));
   }
-  DebugInfo(const Napi::CallbackInfo& info)
-    : Napi::ObjectWrap<DebugInfo>(info) {
+  DebugInfoWrap(const Napi::CallbackInfo& info)
+    : Napi::ObjectWrap<DebugInfoWrap>(info) {
     auto obj = info[0].As<Napi::Object>();
     ELFFile* ef = Napi::ObjectWrap<ELFFile>::Unwrap(obj);
     LOGI("elf %p", ef);
@@ -204,7 +204,7 @@ void ELFFile::Init(Napi::Env env, Napi::Object exports) {
   Napi::Function func = DefineClass(env, "ELFFile", methods);
   exports.Set("ELFFile", func);
   exports.Set(Napi::String::New(env, "demangleCppName"), Napi::Function::New(env, demangleCppName));
-  DebugInfo::Init(env, exports);
+  DebugInfoWrap::Init(env, exports);
 }
 
 ELFFile::ELFFile(const Napi::CallbackInfo& info)
