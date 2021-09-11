@@ -157,21 +157,52 @@ Napi::Value demangleCppName(const Napi::CallbackInfo& info) {
   return Napi::String::New(env, demangled);
 }
 
-static Napi::FunctionReference* constructor = nullptr;
+
+class DebugInfo : public Napi::ObjectWrap<DebugInfo> {
+ public:
+  static void Init(Napi::Env env, Napi::Object exports) {
+    auto methods = {
+      InstanceMethod("srcline", &DebugInfo::srcline),
+      InstanceMethod("release", &DebugInfo::release),
+    };
+    exports.Set("DebugInfo", DefineClass(env, "DebugInfo", methods));
+  }
+  DebugInfo(const Napi::CallbackInfo& info)
+    : Napi::ObjectWrap<DebugInfo>(info) {
+    auto obj = info[0].As<Napi::Object>();
+    ELFFile* ef = Napi::ObjectWrap<ELFFile>::Unwrap(obj);
+    LOGI("elf %p", ef);
+  }
+ private:
+  Napi::Value srcline(const Napi::CallbackInfo& info) {
+    uint64_t addr = info[0].As<Napi::Number>().Int64Value();
+    LOGI("addr %lx", addr);
+
+    Napi::Env env = info.Env();
+    Napi::Object obj = Napi::Object::New(env);
+    auto src = "test.cpp";
+    auto line = 23;
+    obj.Set(Napi::String::New(env, "src"), Napi::String::New(env, src));
+    obj.Set(Napi::String::New(env, "line"), Napi::Number::New(env, line));
+    return obj;
+  }
+  Napi::Value release(const Napi::CallbackInfo& info) {
+    TRACE();
+    Napi::Env env = info.Env();
+    return env.Null();
+  }
+};
 
 void ELFFile::Init(Napi::Env env, Napi::Object exports) {
   auto methods = {
     InstanceMethod("info", &ELFFile::info),
     InstanceMethod("functions", &ELFFile::functions),
-    InstanceMethod("multiply", &ELFFile::Multiply),
+    // InstanceMethod("release", &ELFFile::release),
   };
   Napi::Function func = DefineClass(env, "ELFFile", methods);
   exports.Set("ELFFile", func);
   exports.Set(Napi::String::New(env, "demangleCppName"), Napi::Function::New(env, demangleCppName));
-
-  constructor = new Napi::FunctionReference();
-  *constructor = Napi::Persistent(func);
-  // env.SetInstanceData(constructor);
+  DebugInfo::Init(env, exports);
 }
 
 ELFFile::ELFFile(const Napi::CallbackInfo& info)
@@ -221,16 +252,3 @@ Napi::Value ELFFile::info(const Napi::CallbackInfo& info) {
   return obj;
 }
 
-Napi::Value ELFFile::Multiply(const Napi::CallbackInfo& info) {
-  Napi::Number multiple;
-  if (info.Length() <= 0 || !info[0].IsNumber()) {
-    multiple = Napi::Number::New(info.Env(), 1);
-  } else {
-    multiple = info[0].As<Napi::Number>();
-  }
-
-  Napi::Object obj = constructor->New(
-      {Napi::Number::New(info.Env(), this->value_ * multiple.DoubleValue())});
-
-  return obj;
-}

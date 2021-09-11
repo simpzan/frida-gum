@@ -12,9 +12,7 @@ class ELFFile : public Napi::ObjectWrap<ELFFile> {
  private:
   Napi::Value functions(const Napi::CallbackInfo& info);
   Napi::Value info(const Napi::CallbackInfo& info);
-  Napi::Value Multiply(const Napi::CallbackInfo& info);
 
-  double value_;
   std::unique_ptr<ELF> elf_;
 };
 
