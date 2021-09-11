@@ -10,7 +10,7 @@ class ELFFile : public Napi::ObjectWrap<ELFFile> {
   ELFFile(const Napi::CallbackInfo& info);
 
  private:
-  Napi::Value GetValue(const Napi::CallbackInfo& info);
+  Napi::Value functions(const Napi::CallbackInfo& info);
   Napi::Value info(const Napi::CallbackInfo& info);
   Napi::Value Multiply(const Napi::CallbackInfo& info);
 

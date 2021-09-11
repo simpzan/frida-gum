@@ -1,4 +1,6 @@
 #include <string>
+#include <map>
+#include <vector>
 #include "elf_file.h"
 #include "log.h"
 
@@ -51,6 +53,25 @@ uint64_t getVirtualAddress(const elf::elf &ef) {
   return -1;
 }
 
+struct FunctionSymbol {
+  uint32_t address;
+  uint32_t size;
+  string name;
+};
+std::vector<FunctionSymbol> getFunctionSymbols(const elf::elf &f, elf::sht type) {
+  std::vector<FunctionSymbol> functions;
+  for (auto &sec : f.sections()) {
+    if (sec.get_hdr().type != type) continue;
+    for (auto sym : sec.as_symtab()) {
+      auto &d = sym.get_data();
+      if (d.type() == elf::stt::func) {
+        functions.push_back({d.value, d.size, sym.get_name()});
+      }
+    }
+  }
+  return functions;
+}
+
 class ELF {
  public:
   static unique_ptr<ELF> create(const char *file) {
@@ -81,6 +102,12 @@ class ELF {
   Arch arch() const { return arch_; }
   vector<uint8_t> buildId() const { return getBuildId(*ef_); }
   uint64_t vaddr() const { return getVirtualAddress(*ef_); }
+  std::vector<FunctionSymbol> functionSymbols() {
+    auto result = getFunctionSymbols(*ef_, elf::sht::symtab);
+    if (result.empty()) result = getFunctionSymbols(*ef_, elf::sht::dynsym);
+    return result;
+  }
+
 
  private:
   string path_;
@@ -100,19 +127,17 @@ string archString(ELF::Arch arch) {
 static Napi::FunctionReference* constructor = nullptr;
 
 void ELFFile::Init(Napi::Env env, Napi::Object exports) {
-  Napi::Function func =
-      DefineClass(env,
-                  "ELFFile",
-                  {InstanceMethod("info", &ELFFile::info),
-                   InstanceMethod("value", &ELFFile::GetValue),
-                   InstanceMethod("multiply", &ELFFile::Multiply)});
+  auto methods = {
+    InstanceMethod("info", &ELFFile::info),
+    InstanceMethod("functions", &ELFFile::functions),
+    InstanceMethod("multiply", &ELFFile::Multiply),
+  };
+  Napi::Function func = DefineClass(env, "ELFFile", methods);
+  exports.Set("ELFFile", func);
 
   constructor = new Napi::FunctionReference();
   *constructor = Napi::Persistent(func);
   // env.SetInstanceData(constructor);
-
-  exports.Set("ELFFile", func);
-  TRACE();
 }
 
 ELFFile::ELFFile(const Napi::CallbackInfo& info)
@@ -132,10 +157,22 @@ ELFFile::ELFFile(const Napi::CallbackInfo& info)
   elf_ = ELF::create(path.Utf8Value().c_str());
 }
 
-Napi::Value ELFFile::GetValue(const Napi::CallbackInfo& info) {
-  double num = this->value_;
+Napi::Value ELFFile::functions(const Napi::CallbackInfo& info) {
+  auto functions = elf_->functionSymbols();
+  int count = functions.size();
+  LOGI("count %d", count);
 
-  return Napi::Number::New(info.Env(), num);
+  Napi::Env env = info.Env();
+  auto result = Napi::Array::New(env, count);
+  for (int i = 0; i < count; i++) {
+    auto &fn = functions[i];
+    Napi::Object obj = Napi::Object::New(env);
+    obj.Set(Napi::String::New(env, "name"), Napi::String::New(env, fn.name));
+    obj.Set(Napi::String::New(env, "address"), Napi::Number::New(env, fn.address));
+    obj.Set(Napi::String::New(env, "size"), Napi::Number::New(env, fn.size));
+    result.Set(i, obj);
+  }
+  return result;
 }
 
 Napi::Value ELFFile::info(const Napi::CallbackInfo& info) {
