@@ -13,7 +13,14 @@ console.log( newobj.value() ); // -13
 console.log( obj === newobj ); // false
 
 const log = console.log.bind(console);
+function showBinaryInfo(file) {
+    const lib = new addon.ELFFile(file);
+    const info = lib.info();
+    log(info, info.vaddr.toString(16));
+}
+
 const libuiFile = '/home/simpzan/blueline/aosp_9_r12/out/target/product/generic_arm64/symbols/system/lib/libui.so';
-const libui = new addon.ELFFile(libuiFile);
-const info = libui.info();
-log(info, info.vaddr.toString(16));
+showBinaryInfo(libuiFile);
+
+const libsfFile = '/home/simpzan/frida/libsf.so';
+showBinaryInfo(libsfFile);

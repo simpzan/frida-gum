@@ -40,6 +40,17 @@ std::vector<uint8_t> getBuildId(const elf::elf &f) {
   return id;
 }
 
+uint64_t getVirtualAddress(const elf::elf &ef) {
+  using namespace elf;
+  for (auto &seg : ef.segments()) {
+    auto &hdr = seg.get_hdr();
+    if (hdr.type != pt::load) continue;
+    if ((hdr.flags & pf::x) != pf::x) continue;
+    return hdr.vaddr;
+  }
+  return -1;
+}
+
 class ELF {
  public:
   static unique_ptr<ELF> create(const char *file) {
@@ -68,7 +79,8 @@ class ELF {
     arm64 = 183,
   };
   Arch arch() const { return arch_; }
-  vector<uint8_t> buildId() { return getBuildId(*ef_); }
+  vector<uint8_t> buildId() const { return getBuildId(*ef_); }
+  uint64_t vaddr() const { return getVirtualAddress(*ef_); }
 
  private:
   string path_;
@@ -131,7 +143,7 @@ Napi::Value ELFFile::info(const Napi::CallbackInfo& info) {
   Napi::Object obj = Napi::Object::New(env);
   auto arch = archString(elf_->arch());
   auto buildid = bytes_to_hex_string(elf_->buildId());
-  int vaddr = 0x1234;
+  auto vaddr = elf_->vaddr();
   obj.Set(Napi::String::New(env, "arch"), Napi::String::New(env, arch));
   obj.Set(Napi::String::New(env, "buildid"), Napi::String::New(env, buildid));
   obj.Set(Napi::String::New(env, "vaddr"), Napi::Number::New(env, vaddr));
