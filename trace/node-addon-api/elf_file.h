@@ -1,7 +1,9 @@
 #pragma once
 
+#include <memory>
 #include <napi.h>
 
+class ELF;
 class ELFFile : public Napi::ObjectWrap<ELFFile> {
  public:
   static void Init(Napi::Env env, Napi::Object exports);
@@ -13,5 +15,6 @@ class ELFFile : public Napi::ObjectWrap<ELFFile> {
   Napi::Value Multiply(const Napi::CallbackInfo& info);
 
   double value_;
+  std::unique_ptr<ELF> elf_;
 };
 
