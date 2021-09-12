@@ -29,8 +29,10 @@ class ELF {
   static std::unique_ptr<ELF> create(const char *file);
   ~ELF() {}
   enum class Arch {
-    arm32 = 40,
-    arm64 = 183,
+    x86   = 0x03,
+    x64   = 0x3E,
+    arm32 = 0x28,
+    arm64 = 0xB7,
   };
   Arch arch() const { return arch_; }
   std::vector<uint8_t> buildId() const;
@@ -48,6 +50,8 @@ class ELF {
 
 static inline std::string archString(ELF::Arch arch) {
   switch (arch) {
+  case ELF::Arch::x86: return "x86";
+  case ELF::Arch::x64: return "x64";
   case ELF::Arch::arm32: return "arm32";
   case ELF::Arch::arm64: return "arm64";
   default: return "unknown";
