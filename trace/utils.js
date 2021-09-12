@@ -1,4 +1,12 @@
-const log = console.log.bind(console);
+function log() {
+    let e = new Error();
+    let frame = e.stack.split("\n")[2]; // change to 3 for grandparent func
+    let lineNumber = frame.split(":").reverse()[1];
+    let functionName = frame.split(" ")[5];
+    const srcline = `${functionName}:${lineNumber}`;
+    console.log(srcline, ...arguments);
+}
+// const log = console.log.bind(console);
 // const log = {};
 log.e = console.error.bind(console, "E");
 log.w = console.warn.bind(console, "W");
