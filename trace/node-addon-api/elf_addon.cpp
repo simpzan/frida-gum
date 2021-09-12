@@ -76,6 +76,7 @@ ELFWrap::ELFWrap(const Napi::CallbackInfo& info): Napi::ObjectWrap<ELFWrap>(info
   Napi::String path = info[0].As<Napi::String>();
   LOGI("path %s", path.Utf8Value().c_str());
   elf_ = ELF::create(path.Utf8Value().c_str());
+  if (!elf_) Napi::TypeError::New(env, "failed to read the file").ThrowAsJavaScriptException();
 }
 Napi::Value ELFWrap::functions(const Napi::CallbackInfo& info) {
   auto functions = elf_->functionSymbols();
