@@ -18,8 +18,7 @@ unique_ptr<ELF> ELF::create(const char *file) {
     ERRNO("open('%s', readonly)", file);
     return nullptr;
   }
-
-  auto ef = make_unique<elf::elf>(elf::create_mmap_loader(fd.get()));
+  auto ef = make_unique<elf::elf>(elf::create_mmap_loader(fd.release()));
   auto dw = make_unique<dwarf::dwarf>(dwarf::elf::create_loader(*ef));
   if (!(ef && dw)) {
     LOGE("ef %p, dw %p", ef.get(), dw.get());
@@ -27,7 +26,6 @@ unique_ptr<ELF> ELF::create(const char *file) {
   }
   auto ret = make_unique<ELF>();
   ret->path_ = file;
-  ret->fd_ = move(fd);
   ret->arch_ = (Arch)ef->get_hdr().machine;
   ret->ef_ = move(ef);
   ret->dw_ = move(dw);

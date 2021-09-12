@@ -41,7 +41,6 @@ class ELF {
 
  private:
   std::string path_;
-  unique_fd fd_;
   std::unique_ptr<elf::elf> ef_;
   std::unique_ptr<dwarf::dwarf> dw_;
   Arch arch_;
