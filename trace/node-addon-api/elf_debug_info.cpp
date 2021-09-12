@@ -166,9 +166,8 @@ void DebugInfo::loadDieR(const dwarf::die &die) {
     conflictedDies.push_back(die);
   }
 }
-DebugInfo::DebugInfo(const ELF &elf): elf_(elf) {
-  auto cus = elf.dw_->compilation_units();
-  for (auto &cu: cus) loadDieR(cu.root());
+DebugInfo::DebugInfo(const ELF &elf): elf_(elf), cus_(elf.dw_->compilation_units()) {
+  for (auto &cu: cus_) loadDieR(cu.root());
   LOGI("indexed %d dies, conflicts %d", (int)dies.size(), (int)conflictedDies.size());
 }
 const dwarf::die DebugInfo::die(uint64_t addr) const {

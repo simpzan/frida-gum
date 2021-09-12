@@ -9,6 +9,8 @@
     "build": "node-gyp build --debug",
     "pretest": "npm run build",
     "test": "node addon.js",
+    "preasanTest": "npm run build",
+    "asanTest": "ASAN_OPTIONS=detect_leaks=0 LD_PRELOAD=`gcc -print-file-name=libasan.so` node addon.js",
     "clean": "node-gyp clean"
   },
   "engines": {

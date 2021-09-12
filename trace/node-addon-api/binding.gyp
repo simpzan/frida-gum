@@ -11,6 +11,12 @@
         "../libelfin",
         "<!@(node -p \"require('node-addon-api').include\")"
       ],
+      # "cflags": [
+      #   "-fsanitize=address",
+      # ],
+      # "ldflags": [
+      #   "-fsanitize=address",
+      # ],
       'conditions': [
         ['OS=="linux"', {
           "cflags_cc": [ "-fexceptions", "-frtti" ]

@@ -14,6 +14,7 @@ class DebugInfo {
   const dwarf::die die(uint64_t addr) const;
  private:
   const ELF &elf_;
+  const std::vector<dwarf::compilation_unit> &cus_;
   std::map<uint64_t, dwarf::die> dies;
   std::vector<dwarf::die> conflictedDies;
 };
@@ -54,6 +55,8 @@ static inline std::string archString(ELF::Arch arch) {
 }
 std::string decl_file(const dwarf::die &die);
 static inline int decl_line(const dwarf::die &die) {
-  return die.resolve(dwarf::DW_AT::decl_line).as_uconstant();
+  auto value = die.resolve(dwarf::DW_AT::decl_line);
+  if (!value.valid()) return -1;
+  return value.as_uconstant();
 }
 std::string demangle(const char *mangled_name);
