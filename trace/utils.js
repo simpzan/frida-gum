@@ -84,6 +84,22 @@ function getThreadNames(pid, tids) {
 }
 module.exports = { delay, StdIn, saveObject, loadObject, getThreadNames, makeMap, runCmd };
 
+class ChromeTracingFile {
+    constructor(filename) {
+        this.sink = fs.createWriteStream(filename);
+        this.sink.write("[\n");
+    }
+    writeObject(obj) {
+        this.sink.write(JSON.stringify(obj));
+        this.sink.write(",\n");
+    }
+    close() {
+        this.sink.write("{}]\n");
+        this.sink.end();
+    }
+}
+module.exports.ChromeTracingFile = ChromeTracingFile;
+
 function testInteractively() {
     const names = getThreadNames(709, [709, 751, 856, 1862]);
     log(names);

@@ -33,23 +33,9 @@ function onMessageFromDebuggee(msg, bytes) {
     }
 }
 
-class ChromeTracingFile {
-    constructor(filename) {
-        this.sink = fs.createWriteStream(filename);
-        this.sink.write("[\n");
-    }
-    writeObject(obj) {
-        this.sink.write(JSON.stringify(obj));
-        this.sink.write(",\n");
-    }
-    close() {
-        this.sink.write("{}]\n");
-        this.sink.end();
-    }
-}
 function writeChromeTracingFile(filename, functionMap) {
     log.i(`writing chrome tracing file ${filename}`);
-    const traceFile = new ChromeTracingFile(filename);
+    const traceFile = new utils.ChromeTracingFile(filename);
     for (const trace of events) {
         const fn = functionMap[trace.addr]
         if (!fn) return log.e(`can't find function info for event`, trace);
@@ -181,10 +167,10 @@ async function main() {
     const srclinePrefix = argv[5];
     const sourceFilename = "./test.js";
 
-    process.env['LD_LIBRARY_PATH'] = '/home/simpzan/frida/cpp-example';
+    process.env['LD_LIBRARY_PATH'] = '/home/simpzan/frida/frida/cpp-example';
     const running = isRunning(processName);
     let pid = 0;
-    if (!running) pid = await frida.spawn(['/home/simpzan/frida/cpp-example/main']);
+    if (!running) pid = await frida.spawn(['/home/simpzan/frida/frida/cpp-example/main']);
 
     const script = await attachProcess(deviceId, processName, sourceFilename);
 
