@@ -52,7 +52,7 @@ function writeChromeTracingFile(filename, functionMap) {
     const traceFile = new ChromeTracingFile(filename);
     for (const trace of events) {
         const fn = functionMap[trace.addr]
-        if (!fn) return log.e(`can't find function info for event: ${trace}`);
+        if (!fn) return log.e(`can't find function info for event`, trace);
         trace.name = fn.demangledName = fn.demangledName || addon.demangleCppName(fn.name);
         traceFile.writeObject(trace);
     }
@@ -188,8 +188,16 @@ async function main() {
 
     const script = await attachProcess(deviceId, processName, sourceFilename);
 
-    const functionsToTrace = await getFunctionsToTrace(script.exports, libName, srclinePrefix);
-    if (!functionsToTrace) return log.w('no functions to trace');
+    let functionsToTrace = [];
+    for (const lib of libName.split(',')) {
+        const fns = await getFunctionsToTrace(script.exports, lib, srclinePrefix);
+        if (!fns) {
+            log.w('no functions to trace', lib);
+            continue;
+        }
+        log.i(`collected ${fns.length} functions from ${lib}`);
+        functionsToTrace = fns.concat(functionsToTrace);
+    }
     await script.exports.startTracing(functionsToTrace);
 
     if (pid) await frida.resume(pid);
