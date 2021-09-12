@@ -2,7 +2,7 @@
   "targets": [
     {
       "target_name": "addon",
-      "sources": [ "addon.cc", "myobject.cc", "elf_file.cpp", "elf_debug_info.cpp", "utils.cpp" ],
+      "sources": [ "elf_addon.cpp", "elf_debug_info.cpp", "utils.cpp" ],
       "libraries": [
         "<!(pwd)/../libelfin/dwarf/libdwarf++.a",
         "<!(pwd)/../libelfin/elf/libelf++.a"

@@ -1,16 +1,21 @@
-#include "elf_file.h"
+#include <memory>
+#include <napi.h>
 #include "elf_debug_info.h"
 #include "log.h"
-
 using namespace std;
 
-Napi::Value demangleCppName(const Napi::CallbackInfo& info) {
-  Napi::Env env = info.Env();
-  auto name = info[0].As<Napi::String>().Utf8Value();
-  auto demangled = demangle(name.c_str());
-  // LOGI("name %s -> %s", name.Utf8Value().c_str(), demangled.c_str());
-  return Napi::String::New(env, demangled);
-}
+class ELFWrap : public Napi::ObjectWrap<ELFWrap> {
+ public:
+  static void Init(Napi::Env env, Napi::Object exports);
+  ELFWrap(const Napi::CallbackInfo& info);
+
+ private:
+  Napi::Value functions(const Napi::CallbackInfo& info);
+  Napi::Value info(const Napi::CallbackInfo& info);
+
+  std::unique_ptr<ELF> elf_;
+  friend class DebugInfoWrap;
+};
 
 class DebugInfoWrap : public Napi::ObjectWrap<DebugInfoWrap> {
  public:
@@ -60,18 +65,10 @@ void ELFWrap::Init(Napi::Env env, Napi::Object exports) {
   };
   Napi::Function func = DefineClass(env, "ELFWrap", methods);
   exports.Set("ELFWrap", func);
-  exports.Set(Napi::String::New(env, "demangleCppName"), Napi::Function::New(env, demangleCppName));
-  DebugInfoWrap::Init(env, exports);
 }
-
-ELFWrap::ELFWrap(const Napi::CallbackInfo& info)
-    : Napi::ObjectWrap<ELFWrap>(info) {
-  TRACE();
+ELFWrap::ELFWrap(const Napi::CallbackInfo& info): Napi::ObjectWrap<ELFWrap>(info) {
   Napi::Env env = info.Env();
-
-  int length = info.Length();
-
-  if (length <= 0 || !info[0].IsString()) {
+  if (info.Length() <= 0 || !info[0].IsString()) {
     Napi::TypeError::New(env, "String expected").ThrowAsJavaScriptException();
     return;
   }
@@ -80,7 +77,6 @@ ELFWrap::ELFWrap(const Napi::CallbackInfo& info)
   LOGI("path %s", path.Utf8Value().c_str());
   elf_ = ELF::create(path.Utf8Value().c_str());
 }
-
 Napi::Value ELFWrap::functions(const Napi::CallbackInfo& info) {
   auto functions = elf_->functionSymbols();
   int count = functions.size();
@@ -98,7 +94,6 @@ Napi::Value ELFWrap::functions(const Napi::CallbackInfo& info) {
   }
   return result;
 }
-
 Napi::Value ELFWrap::info(const Napi::CallbackInfo& info) {
   Napi::Env env = info.Env();
   Napi::Object obj = Napi::Object::New(env);
@@ -111,3 +106,18 @@ Napi::Value ELFWrap::info(const Napi::CallbackInfo& info) {
   return obj;
 }
 
+Napi::Value demangleCppName(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  auto name = info[0].As<Napi::String>().Utf8Value();
+  auto demangled = demangle(name.c_str());
+  // LOGI("name %s -> %s", name.Utf8Value().c_str(), demangled.c_str());
+  return Napi::String::New(env, demangled);
+}
+
+Napi::Object InitAll(Napi::Env env, Napi::Object exports) {
+  ELFWrap::Init(env, exports);
+  DebugInfoWrap::Init(env, exports);
+  exports.Set(Napi::String::New(env, "demangleCppName"), Napi::Function::New(env, demangleCppName));
+  return exports;
+}
+NODE_API_MODULE(addon, InitAll)
