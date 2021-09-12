@@ -1,4 +1,5 @@
 const addon = require('bindings')('addon');
+module.exports = addon;
 const log = console.log.bind(console);
 
 function showBinaryInfo(file) {
@@ -14,15 +15,17 @@ function showBinaryInfo(file) {
     debugInfo.release();
     lib = null;
 }
+function test() {
+    // const libuiFile = '/home/simpzan/blueline/aosp_9_r12/out/target/product/generic_arm64/symbols/system/lib/libui.so';
+    // showBinaryInfo(libuiFile);
 
-const libuiFile = '/home/simpzan/blueline/aosp_9_r12/out/target/product/generic_arm64/symbols/system/lib/libui.so';
-showBinaryInfo(libuiFile);
+    // const libsfFile = '/home/simpzan/frida/libsf.so';
+    // showBinaryInfo(libsfFile);
 
-// const libsfFile = '/home/simpzan/frida/libsf.so';
-// showBinaryInfo(libsfFile);
-
-// showBinaryInfo(libuiFile);
-
-setTimeout(() => {
-
-}, 3000);
+    const libtestPath = '/home/simpzan/frida/cpp-example/libtest.so';
+    showBinaryInfo(libtestPath);
+}
+if (require.main === module) {
+    console.log('called directly');
+    test();
+}

@@ -1,11 +1,10 @@
 const fs = require('fs');
 const utils = require('./utils.js');
-// const CppDemangler = require('./CppDemangler.js');
-const CppDemangler = require('./CppDemangler.node');
-log("cwd", process.cwd())
 const fridaMac = '../../build/frida-macos-x86_64/lib/node_modules/frida';
 const fridaLinux = '../../build/frida_thin-linux-x86_64/lib/node_modules/frida';
-const frida = require(fridaMac);
+const fridaPath = process.platform == 'darwin' ? fridaMac : fridaLinux;
+const frida = require(fridaPath);
+const addon = require('./node-addon-api');
 
 let threadNames = new Map();
 let events = [];
@@ -54,7 +53,7 @@ function writeChromeTracingFile(filename, functionMap) {
     for (const trace of events) {
         const fn = functionMap[trace.addr]
         if (!fn) return log.e(`can't find function info for event: ${trace}`);
-        trace.name = fn.demangledName || fn.name;
+        trace.name = fn.demangledName = fn.demangledName || addon.demangleCppName(fn.name);
         traceFile.writeObject(trace);
     }
     const pid = events[0].pid;
@@ -133,25 +132,35 @@ async function getFunctionsToTrace(rpc, libName, srclinePrefix) {
     const module = await rpc.getModuleByName(libName);
     log.i(module);
     const baseAddr = parseInt(module.base, 16);
-    const srclineReader = new CppDemangler.SourceLineFinder(getBinaryLocalPath(module));
-    const vaddr = isAndroid() ? srclineReader.getVirtualAddress() : 0;
-    const buildIdLocal = srclineReader.getBuidId();
+    const modulePath = getBinaryLocalPath(module);
+    let lib = new addon.ELFWrap(modulePath);
+    const localModuleInfo = lib.info();
+    log(localModuleInfo);
+    const vaddr = isAndroid() ? localModuleInfo.vaddr : 0;
+    const buildIdLocal = localModuleInfo.buildid;
     const buildIdRemote = await rpc.getBuidId(module.path);
     if (buildIdLocal != buildIdRemote) {
         return log.e(`build id mismatch ${buildIdLocal} ${buildIdRemote}`);
     }
-    let functions = srclineReader.getFunctions();
+    const functions = lib.functions().filter(fn => fn.address && fn.size);
+    const debugInfo = new addon.DebugInfoWrap(lib);
     const functionsToTrace = [];
     for (const fn of functions) {
         if (fn.name.includes('~')) continue;
-        const info = srclineReader.srcline(fn.addr);
+        const info = debugInfo.srcline(fn.address);
+        if (!info.src) {
+            log.w('no debug info', fn);
+            continue;
+        }
+        info.file = info.src;
         if (srclinePrefix && !info.file.startsWith(srclinePrefix)) continue;
         fn.file = info.file;
         fn.line = info.line;
-        const addr = fn.addr - vaddr + baseAddr;
+        const addr = fn.address - vaddr + baseAddr;
         fn.addr = addr;
         functionsToTrace.push(fn);
     }
+    debugInfo.release();
     const modules = ['/system/lib64/libGLESv2.so', '/system/lib64/libEGL.so'];
     await addImportedFunctions(rpc, libName, modules, functionsToTrace);
     if (functionsToTrace.length > Math.pow(2, 16)) {
@@ -180,6 +189,7 @@ async function main() {
     const script = await attachProcess(deviceId, processName, sourceFilename);
 
     const functionsToTrace = await getFunctionsToTrace(script.exports, libName, srclinePrefix);
+    if (!functionsToTrace) return log.w('no functions to trace');
     await script.exports.startTracing(functionsToTrace);
 
     if (pid) await frida.resume(pid);
