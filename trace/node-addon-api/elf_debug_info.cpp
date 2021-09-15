@@ -82,7 +82,8 @@ std::vector<FunctionSymbol> getFunctionSymbols(const elf::elf &f, elf::sht type)
     for (auto sym : sec.as_symtab()) {
       auto &d = sym.get_data();
       if (d.type() == elf::stt::func) {
-        functions.push_back({d.value, d.size, sym.get_name()});
+        auto addr = static_cast<uint32_t>(d.value), size = static_cast<uint32_t>(d.size);
+        functions.push_back({addr, size, sym.get_name()});
       }
     }
   }
@@ -164,7 +165,7 @@ void DebugInfo::loadDieR(const dwarf::die &die) {
     conflictedDies.push_back(die);
   }
 }
-DebugInfo::DebugInfo(const ELF &elf): elf_(elf), cus_(elf.dw_->compilation_units()) {
+DebugInfo::DebugInfo(const ELF &elf): cus_(elf.dw_->compilation_units()) {
   for (auto &cu: cus_) loadDieR(cu.root());
   LOGI("indexed %d dies, conflicts %d", (int)dies.size(), (int)conflictedDies.size());
 }

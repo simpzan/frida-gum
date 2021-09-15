@@ -13,7 +13,6 @@ class DebugInfo {
   DebugInfo(const ELF &elf);
   const dwarf::die die(uint64_t addr) const;
  private:
-  const ELF &elf_;
   const std::vector<dwarf::compilation_unit> &cus_;
   std::map<uint64_t, dwarf::die> dies;
   std::vector<dwarf::die> conflictedDies;

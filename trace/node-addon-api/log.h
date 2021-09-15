@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <time.h>
 #include <unistd.h>
+#include <string.h>
+#include <errno.h>
 
 static inline int getTimeString(char *buffer, int length) {
     time_t timer;
@@ -13,7 +15,15 @@ static inline int getTimeString(char *buffer, int length) {
     return 0;
 }
 
-// int64_t gettid();
+#if __APPLE__
+#include <pthread.h>
+static inline uint64_t gettid() {
+    uint64_t tid = 0;
+    pthread_threadid_np(NULL, &tid);
+    return tid;
+}
+#endif
+
 #define LOG_PRINT(level, format, args...) do { \
     char buffer[16] = {0}; getTimeString(buffer, 16); \
     printf("%s %s %d:%u %s:%d " format "\n", buffer, level, getpid(), \
