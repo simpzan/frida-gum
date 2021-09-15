@@ -103,11 +103,12 @@ function validateFunctions(functionsLocal, functionsRemote) {
     for (const fn of functionsRemote) {
         const addr = parseInt(fn.address, 16);
         remoteFunctions.set(addr, fn);
+        remoteFunctions.set(fn.name, fn);
     }
     for (const fn of functionsLocal) {
         const remote = remoteFunctions.get(fn.addr);
         if (!remote) {
-            log.e('invalid function', fn);
+            log.e('invalid function', fn, remoteFunctions.get(fn.name));
             return false;
         }
         if (remote.size != fn.size) log.e('invalid function size', fn, remote);

@@ -62,7 +62,7 @@ class Tracer {
             try {
                 Interceptor.attach(addr, this.attachCallbacks, functionId);
             } catch (error) {
-                log('attach failed', error, fn);
+                log('attach failed', error.toString(), fn);
             }
         });
         log(`tracing ${functions.length} function addresses.`);
