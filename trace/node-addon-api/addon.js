@@ -3,7 +3,7 @@ module.exports = addon;
 const log = console.log.bind(console);
 
 function showBinaryInfo(file) {
-    let lib = new addon.ELFWrap(file);
+    const lib = new addon.ELFWrap(file);
     const info = lib.info();
     log(info, info.vaddr.toString(16));
     const functions = lib.functions();
@@ -13,7 +13,7 @@ function showBinaryInfo(file) {
         log(index, fn, addon.demangleCppName(fn.name), debugInfo.srcline(fn.address));
     });
     debugInfo.release();
-    lib = null;
+    lib.release();
 }
 function test() {
     // const libuiFile = '/home/simpzan/blueline/aosp_9_r12/out/target/product/generic_arm64/symbols/system/lib/libui.so';
@@ -22,7 +22,7 @@ function test() {
     // const libsfFile = '/home/simpzan/frida/libsf.so';
     // showBinaryInfo(libsfFile);
 
-    const libtestPath = '/home/simpzan/frida/cpp-example/libtest.so';
+    const libtestPath = '/home/simpzan/frida/frida/cpp-example/libtest.so';
     showBinaryInfo(libtestPath);
 }
 if (require.main === module) {

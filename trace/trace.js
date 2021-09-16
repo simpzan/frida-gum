@@ -148,6 +148,7 @@ async function getFunctionsToTrace(rpc, libName, srclinePrefix) {
         functionsToTrace.push(fn);
     }
     debugInfo.release();
+    lib.release();
     const modules = ['/system/lib64/libGLESv2.so', '/system/lib64/libEGL.so'];
     await addImportedFunctions(rpc, libName, modules, functionsToTrace);
     if (functionsToTrace.length > Math.pow(2, 16)) {

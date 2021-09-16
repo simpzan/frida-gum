@@ -12,7 +12,10 @@ class ELFWrap : public Napi::ObjectWrap<ELFWrap> {
  private:
   Napi::Value functions(const Napi::CallbackInfo& info);
   Napi::Value info(const Napi::CallbackInfo& info);
-
+  Napi::Value release(const Napi::CallbackInfo& info) {
+    elf_.reset();
+    return info.Env().Null();
+  }
   std::unique_ptr<ELF> elf_;
   friend class DebugInfoWrap;
 };
@@ -61,7 +64,7 @@ void ELFWrap::Init(Napi::Env env, Napi::Object exports) {
   auto methods = {
     InstanceMethod("info", &ELFWrap::info),
     InstanceMethod("functions", &ELFWrap::functions),
-    // InstanceMethod("release", &ELFWrap::release),
+    InstanceMethod("release", &ELFWrap::release),
   };
   Napi::Function func = DefineClass(env, "ELFWrap", methods);
   exports.Set("ELFWrap", func);
