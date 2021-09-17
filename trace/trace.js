@@ -98,12 +98,12 @@ function validateFunctions(functionsLocal, functionsRemote) {
 }
 async function getFunctionsToTrace(rpc, libName, srclinePrefix) {
     const module = await rpc.getModuleByName(libName);
-    log.i(module);
+    log('module info from server', module);
     const baseAddr = parseInt(module.base, 16);
     const modulePath = getBinaryLocalPath(module);
     let lib = new addon.ELFWrap(modulePath);
     const localModuleInfo = lib.info();
-    log(localModuleInfo);
+    log('module info from local addon', localModuleInfo);
     const vaddr = isAndroid() ? localModuleInfo.vaddr : 0;
     const buildIdLocal = localModuleInfo.buildid;
     const buildIdRemote = await rpc.getBuidId(module.path);

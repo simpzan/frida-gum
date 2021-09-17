@@ -53,7 +53,7 @@ class DebugInfoWrap : public Napi::ObjectWrap<DebugInfoWrap> {
     return obj;
   }
   Napi::Value release(const Napi::CallbackInfo& info) {
-    TRACE();
+    // TRACE();
     debugInfo_.reset();
     Napi::Env env = info.Env();
     return env.Null();
@@ -77,7 +77,7 @@ ELFWrap::ELFWrap(const Napi::CallbackInfo& info): Napi::ObjectWrap<ELFWrap>(info
   }
 
   Napi::String path = info[0].As<Napi::String>();
-  LOGI("path %s", path.Utf8Value().c_str());
+  // LOGI("path %s", path.Utf8Value().c_str());
   elf_ = ELF::create(path.Utf8Value().c_str());
   if (!elf_) Napi::TypeError::New(env, "failed to read the file").ThrowAsJavaScriptException();
 }

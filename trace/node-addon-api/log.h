@@ -26,8 +26,8 @@ static inline uint64_t gettid() {
 
 #define LOG_PRINT(level, format, args...) do { \
     char buffer[16] = {0}; getTimeString(buffer, 16); \
-    printf("%s %s %d:%u %s:%d " format "\n", buffer, level, getpid(), \
-        (uint32_t)gettid(), __FILE__, __LINE__, ##args); \
+    printf("%s %s %d:%u %s:%d:%s " format "\n", buffer, level, getpid(), \
+        (uint32_t)gettid(), (char *)__FILE__, __LINE__, __FUNCTION__, ##args); \
 } while (0)
 #define ERRNO(format, args...) LOG_PRINT("E", format ", errno %d %s", \
     ##args, errno, strerror(errno))
