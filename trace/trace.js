@@ -56,25 +56,6 @@ function getBinaryLocalPath(module) {
     if (isAndroid()) return `/tmp/${module.name}`;
     return module.path;
 }
-async function attachProcess(deviceId, processName, sourceFilename) {
-    const device = await frida.getDevice(deviceId);
-    if (!device) return log.e(`device '${deviceId}' not found.`);
-
-    targetDevice = device;
-    log.i(`tracing process '${processName}' of device '${device.name}'`);
-    const session = await device.attach(processName);
-    const source = fs.readFileSync(sourceFilename, "utf8");
-    const script = await session.createScript(source, { runtime: 'v8' });
-    script.message.connect(onMessageFromDebuggee);
-    script.destroyed.connect(() => script.unloaded = true);
-    await script.load();
-    return script;
-}
-
-function isRunning(program) {
-    const out = utils.runCmd(`pidof ${program}`);
-    return out && out.length;
-}
 
 async function addImportedFunctions(rpc, libName, modules, functions) {
     const imported = await rpc.getImportedFunctions(libName);
@@ -159,6 +140,65 @@ async function getFunctionsToTrace(rpc, libName, srclinePrefix) {
     return functionsToTrace;
 }
 
+class Process {
+    static async getOrSpawn(deviceId, name, path = null) {
+        const device = await frida.getDevice(deviceId);
+        if (!device) throw new Error(`device '${deviceId}' not found.`);
+
+        const processes = await device.enumerateProcesses();
+        const process = processes.find(p => p.name == name);
+        if (process.pid) return new Process(device, process.pid, name);
+
+        const pid = await device.spawn(path || name);
+        if (pid) return new Process(device, pid, name, true);
+
+        throw new Error(`spawn ${name} failed on device ${deviceId}`);
+    }
+    constructor(device, pid, name, spawned = false) {
+        this.device = device;
+        this.pid = pid;
+        this.name = name;
+        this.spawned = spawned;
+    }
+    async attach(sourceFilename) {
+        const session = this.session = await this.device.attach(this.pid);
+        const source = fs.readFileSync(sourceFilename, "utf8");
+        const script = await session.createScript(source, { runtime: 'v8' });
+        await script.load();
+        return new Script(script);
+    }
+    async resume() {
+        if (!this.spawned) return;
+        await frida.resume(this.pid);
+    }
+};
+
+class Script {
+    constructor(script) {
+        this.script = script;
+        script.message.connect(onMessageFromDebuggee);
+        script.destroyed.connect(() => this.unloaded = true);
+    }
+    async startTracing(functionsToTrace) {
+        await this.script.exports.startTracing(functionsToTrace);
+    }
+    async stopTracing() {
+        if (this.unloaded) return;
+        await this.script.exports.stopTracing();
+        await this.script.unload();
+    }
+    async getModuleByName(libName) {
+        return await this.script.exports.getModuleByName(libName);
+    }
+    async getBuidId(path) { return await this.script.exports.getBuidId(path); }
+    async getFunctionsOfModule(libName) {
+        return await this.script.exports.getFunctionsOfModule(libName);
+    }
+    async getImportedFunctions(libName) {
+        return await this.script.exports.getImportedFunctions(libName);
+    }
+};
+
 async function main() {
     const argv = process.argv;
     log.i("argv", argv);
@@ -169,16 +209,12 @@ async function main() {
     const srclinePrefix = argv[5];
     const sourceFilename = "./test.js";
 
-    process.env['LD_LIBRARY_PATH'] = '/home/simpzan/frida/frida/cpp-example';
-    const running = isRunning(processName);
-    let pid = 0;
-    if (!running) pid = await frida.spawn(['/home/simpzan/frida/frida/cpp-example/main']);
-
-    const script = await attachProcess(deviceId, processName, sourceFilename);
+    const targetProcess = await Process.getOrSpawn(deviceId, processName);
+    const script = await targetProcess.attach(sourceFilename);
 
     let functionsToTrace = [];
     for (const lib of libName.split(',')) {
-        const fns = await getFunctionsToTrace(script.exports, lib, srclinePrefix);
+        const fns = await getFunctionsToTrace(script, lib, srclinePrefix);
         if (!fns) {
             log.w('no functions to trace', lib);
             continue;
@@ -186,9 +222,9 @@ async function main() {
         log.i(`collected ${fns.length} functions from ${lib}`);
         functionsToTrace = fns.concat(functionsToTrace);
     }
-    await script.exports.startTracing(functionsToTrace);
+    await script.startTracing(functionsToTrace);
 
-    if (pid) await frida.resume(pid);
+    await targetProcess.resume();
 
     log.i('Tracing started, press enter to stop.');
 
@@ -196,10 +232,7 @@ async function main() {
     await stdin.getline();
     stdin.destroy();
 
-    if (!script.unloaded) {
-        await script.exports.stopTracing();
-        script.unload();
-    }
+    await script.stopTracing();
 
     if (!events.length) return log.i('no trace data.');
 
