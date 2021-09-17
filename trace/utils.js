@@ -25,6 +25,11 @@ function delay(seconds) {
 }
 
 class StdIn {
+    static async readline() {
+        const stdin = new StdIn();
+        await stdin.getline();
+        stdin.destroy();
+    }
     constructor() {
         var readline = require('readline');
         this.rl = readline.createInterface({

@@ -223,14 +223,10 @@ async function main() {
         functionsToTrace = fns.concat(functionsToTrace);
     }
     await script.startTracing(functionsToTrace);
-
     await targetProcess.resume();
 
     log.i('Tracing started, press enter to stop.');
-
-    const stdin = new utils.StdIn();
-    await stdin.getline();
-    stdin.destroy();
+    await utils.StdIn.readline();
 
     await script.stopTracing();
 
