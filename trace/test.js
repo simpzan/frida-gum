@@ -13,13 +13,13 @@ function getNativeFunction(module, name, argumentTypes = [], returnType = 'void'
     return fn;
 }
 
-function getBuidId(soPath) {
-    const getBuidId_addr = Module.getExportByName('libtrace.so', 'getBuidId');
-    const getBuidId = new NativeFunction(getBuidId_addr, 'int', ['pointer', 'pointer', 'int']);
+function getBuildId(soPath) {
+    const getBuidId_addr = Module.getExportByName('libtrace.so', 'getBuildId');
+    const getBuildId = new NativeFunction(getBuidId_addr, 'int', ['pointer', 'pointer', 'int']);
     const soPath2 = Memory.allocUtf8String(soPath);
     const length = 64;
     const bytes = Memory.alloc(length);
-    const size = getBuidId(soPath2, bytes, length);
+    const size = getBuildId(soPath2, bytes, length);
     if (0 < size && size < length) return bytes.readUtf8String();
     log(`failed to getBuildId(${soPath}): ${size}`);
     return "";
@@ -77,10 +77,11 @@ class Tracer {
 const tracer = new Tracer();
 
 rpc.exports = {
-    getBuidId(path) { return getBuidId(path); },
     getModuleByName(libName) {
         Module.load(libName);
-        return Process.getModuleByName(libName);
+        const module = Process.getModuleByName(libName);
+        module.buildId = getBuildId(module.path);
+        return module;
     },
     getImportedFunctions(libName) { return Module.enumerateImportsSync(libName); },
     getFunctionsOfModule(libName) {

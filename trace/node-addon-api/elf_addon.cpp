@@ -102,10 +102,10 @@ Napi::Value ELFWrap::info(const Napi::CallbackInfo& info) {
   Napi::Env env = info.Env();
   Napi::Object obj = Napi::Object::New(env);
   auto arch = archString(elf_->arch());
-  auto buildid = bytes_to_hex_string(elf_->buildId());
+  auto buildId = bytes_to_hex_string(elf_->buildId());
   auto vaddr = elf_->vaddr();
   obj.Set(Napi::String::New(env, "arch"), Napi::String::New(env, arch));
-  obj.Set(Napi::String::New(env, "buildid"), Napi::String::New(env, buildid));
+  obj.Set(Napi::String::New(env, "buildId"), Napi::String::New(env, buildId));
   obj.Set(Napi::String::New(env, "vaddr"), Napi::Number::New(env, vaddr));
   return obj;
 }

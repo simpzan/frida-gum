@@ -31,7 +31,7 @@ std::string bytes_to_hex_string(const uint8_t *bytes, int length) {
 extern "C" {
 
 #include "build-id.h"
-int getBuidId(const char *name, char *bytes, int length) {
+int getBuildId(const char *name, char *bytes, int length) {
   auto note = build_id_find_nhdr_by_name(name);
   if (!note) return 0;
 

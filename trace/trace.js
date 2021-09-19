@@ -103,8 +103,8 @@ async function getFunctionsToTrace(rpc, libName, srclinePrefix) {
     const localModuleInfo = lib.info();
     log('module info from local addon', localModuleInfo);
     const vaddr = isAndroid() ? localModuleInfo.vaddr : 0;
-    const buildIdLocal = localModuleInfo.buildid;
-    const buildIdRemote = await rpc.getBuidId(module.path);
+    const buildIdLocal = localModuleInfo.buildId;
+    const buildIdRemote = module.buildId;
     if (buildIdLocal != buildIdRemote) {
         return log.e(`build id mismatch ${buildIdLocal} ${buildIdRemote}`);
     }
@@ -188,7 +188,6 @@ class Script {
     async getModuleByName(libName) {
         return await this.script.exports.getModuleByName(libName);
     }
-    async getBuidId(path) { return await this.script.exports.getBuidId(path); }
     async getFunctionsOfModule(libName) {
         return await this.script.exports.getFunctionsOfModule(libName);
     }
