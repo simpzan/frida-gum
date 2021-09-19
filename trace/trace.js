@@ -67,10 +67,11 @@ function validateFunctions(functionsLocal, functionsRemote) {
     }
 }
 
+let sysroot = '';
 class Module {
     static create(remoteModuleInfo) {
         log.i('module info from server', remoteModuleInfo);
-        let lib = new addon.ELFWrap(remoteModuleInfo.path);
+        let lib = new addon.ELFWrap(sysroot + remoteModuleInfo.path);
         const localModuleInfo = lib.info();
         log.i('module info from local addon', localModuleInfo);
         if (localModuleInfo.buildId != remoteModuleInfo.buildId) {
@@ -197,6 +198,7 @@ async function main() {
     const processName = argv[3] || "main";
     const libName = argv[4] || "libtest.so";
     const srclinePrefix = argv[5];
+    sysroot = argv[6] || sysroot;
     const sourceFilename = "./test.js";
 
     const targetProcess = await Process.getOrSpawn(deviceId, processName);
