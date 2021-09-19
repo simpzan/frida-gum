@@ -22,12 +22,15 @@ static inline uint64_t gettid() {
     pthread_threadid_np(NULL, &tid);
     return tid;
 }
+#elif __GLIBC__ == 2 && __GLIBC_MINOR__ < 30
+#include <sys/syscall.h>
+#define gettid() syscall(SYS_gettid)
 #endif
 
 #define LOG_PRINT(level, format, args...) do { \
     char buffer[16] = {0}; getTimeString(buffer, 16); \
     printf("%s %s %d:%u %s:%d:%s " format "\n", buffer, level, getpid(), \
-        (uint32_t)gettid(), (char *)__FILE__, __LINE__, __FUNCTION__, ##args); \
+        (uint32_t)gettid(), basename(__FILE__), __LINE__, __FUNCTION__, ##args); \
 } while (0)
 #define ERRNO(format, args...) LOG_PRINT("E", format ", errno %d %s", \
     ##args, errno, strerror(errno))

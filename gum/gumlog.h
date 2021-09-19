@@ -3,6 +3,11 @@
 #include <stdint.h>
 #include <libgen.h>
 
+#if __GLIBC__ == 2 && __GLIBC_MINOR__ < 30
+#include <sys/syscall.h>
+#define gettid() syscall(SYS_gettid)
+#endif
+
 #define LOG_PRINT(level, format, args...) do { \
     char buffer[16] = {0};  \
     printf("%s %s %d:%u %s:%d " format "\n", buffer, level, getpid(), \
