@@ -1,11 +1,22 @@
-function log() {
-    const args = [];
-    for (const arg of arguments) {
-        args.push(JSON.stringify(arg));
-    }
-    console.log('test.js', ...args);
-}
 const pid = Process.id;
+function log(level, ...args) {
+    let e = new Error();
+    let frame = e.stack.split("\n")[2]; // change to 3 for grandparent func
+    let lineNumber = frame.split(":").reverse()[1];
+    let functionName = frame.split(" ")[5];
+    const time = Date.now() / 1000;
+    const srcline = `${time.toFixed(3)} ${level} ${pid} ${functionName}:${lineNumber}\t`;
+    console.log(srcline, ...args);
+}
+const noop = () => {};
+log.e = log.bind(null, "E");
+log.w = log.bind(null, "W");
+log.i = log.bind(null, "I");
+log.d = log.bind(null, "D");
+log.v = log.bind(null, "V");
+// log.d = noop;
+log.v = noop;
+global.log = log;
 
 function getNativeFunction(module, name, argumentTypes = [], returnType = 'void') {
     const ptr = module.getExportByName(name);
@@ -21,7 +32,7 @@ function getBuildId(soPath) {
     const bytes = Memory.alloc(length);
     const size = getBuildId(soPath2, bytes, length);
     if (0 < size && size < length) return bytes.readUtf8String();
-    log(`failed to getBuildId(${soPath}): ${size}`);
+    log.e(`failed to getBuildId(${soPath}): ${size}`);
     return "";
 }
 
@@ -29,7 +40,7 @@ function loadLibTrace(path, callback) {
     const module = Module.load(path);
     const sendDataFn = module.getExportByName('_sendDataFn');
     const sendData = new NativeCallback(callback, 'void', ['pointer', 'int', 'int']);
-    log(`sendData ${sendData}`);
+    log.d(`sendData ${sendData}`);
     sendDataFn.writePointer(sendData);
     const flushAll = getNativeFunction(module, 'flushAll');
 
@@ -46,7 +57,7 @@ const onTraceEvent = function(bytes, length, tid) {
     // bytes = bytes.add(8);
     // const ts = bytes.readS64();
     const data = bytes.readByteArray(length);
-    log(`event from tid ${tid}, ${length} bytes`);
+    log.d(`event from tid ${tid}, ${length} bytes`);
     send({ type:'events', tid, pid }, data);
 }
 
@@ -62,10 +73,10 @@ class Tracer {
             try {
                 Interceptor.attach(addr, this.attachCallbacks, functionId);
             } catch (error) {
-                log('attach failed', error.toString(), fn);
+                log.e('attach failed', error.toString(), fn);
             }
         });
-        log(`tracing ${functions.length} function addresses.`);
+        log.i(`tracing ${functions.length} function addresses.`);
     }
     exit() {
         Interceptor.detachAll();
@@ -87,15 +98,15 @@ rpc.exports = {
     getFunctionsOfModule(libName) {
         const module = Process.getModuleByName(libName);
         let functions = module.enumerateSymbols();
-        // log(module, functions);
+        // log.d(module, functions);
         functions = functions.filter(s => {
             return s.type === 'function';
         });
-        log(`${pid} ${libName} ${functions.length} functions`);
+        log.i(`${libName} ${functions.length} functions`);
         return functions;
     },
     startTracing(functions) {
-        log(`startTracing`)
+        log.i(`startTracing`)
         tracer.traceFunctions(functions);
     },
     stopTracing() {

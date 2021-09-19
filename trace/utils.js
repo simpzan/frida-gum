@@ -1,19 +1,18 @@
-function log() {
+function log(level, ...args) {
     let e = new Error();
     let frame = e.stack.split("\n")[2]; // change to 3 for grandparent func
     let lineNumber = frame.split(":").reverse()[1];
     let functionName = frame.split(" ")[5];
-    const srcline = `${functionName}:${lineNumber}`;
-    console.log(srcline, ...arguments);
+    const time = Date.now() / 1000;
+    const srcline = `${time.toFixed(3)} ${level} ${process.pid} ${functionName}:${lineNumber}\t`;
+    console.log(srcline, ...args);
 }
-// const log = console.log.bind(console);
-// const log = {};
-log.e = console.error.bind(console, "E");
-log.w = console.warn.bind(console, "W");
-log.i = console.info.bind(console, "I");
-log.d = console.debug.bind(console, "D");
-log.v = console.log.bind(console, "V");
-const noop = () => { };
+const noop = () => {};
+log.e = log.bind(null, "E");
+log.w = log.bind(null, "W");
+log.i = log.bind(null, "I");
+log.d = log.bind(null, "D");
+log.v = log.bind(null, "V");
 // log.d = noop;
 log.v = noop;
 global.log = log;
