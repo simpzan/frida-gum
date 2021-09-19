@@ -1,9 +1,7 @@
 const fs = require('fs');
 const utils = require('./utils.js');
-const fridaMac = '../../build/frida-macos-x86_64/lib/node_modules/frida';
-const fridaLinux = '../../build/frida_thin-linux-x86_64/lib/node_modules/frida';
-const fridaPath = process.platform == 'darwin' ? fridaMac : fridaLinux;
-const frida = require(fridaPath);
+const fridaDir = process.platform == 'darwin' ? 'frida-macos-x86_64' : 'frida_thin-linux-x86_64';
+const frida = require(`../../build/${fridaDir}/lib/node_modules/frida`);
 const addon = require('./node-addon-api');
 
 let threadNames = new Map();
