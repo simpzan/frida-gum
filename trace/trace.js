@@ -48,93 +48,86 @@ function writeChromeTracingFile(filename, functionMap) {
     }
     traceFile.close();
 }
-let targetDevice = null;
-function isAndroid() { return targetDevice && targetDevice.type === 'usb'; }
-function getBinaryLocalPath(module) {
-    if (isAndroid()) return `/tmp/${module.name}`;
-    return module.path;
-}
-
-async function addImportedFunctions(rpc, libName, modules, functions) {
-    const imported = await rpc.getImportedFunctions(libName);
-    const symbolsByModule = new Map();
-    for (const symbol of imported) {
-        const symbols = symbolsByModule.get(symbol.module) || [];
-        symbols.push(symbol);
-        symbolsByModule.set(symbol.module, symbols);
-    }
-    for (const [module, symbols] of symbolsByModule) {
-        log.v(`imported ${symbols.length} symbols from ${module}`);
-        if (!modules.includes(module)) continue;
-
-        for (const symbol of symbols) {
-            if (symbol.type != 'function') continue;
-            const addr = parseInt(symbol.address, 16);
-            symbol.addr = addr;
-            functions.push(symbol);
-        }
-        log.i(`added ${symbols.length} symbols from ${module}`);
-    }
-}
 
 function validateFunctions(functionsLocal, functionsRemote) {
     const remoteFunctions = new Map();
     for (const fn of functionsRemote) {
-        const addr = parseInt(fn.address, 16);
+        const addr = fn.addr = parseInt(fn.address, 16);
         remoteFunctions.set(addr, fn);
         remoteFunctions.set(fn.name, fn);
     }
     for (const fn of functionsLocal) {
-        const remote = remoteFunctions.get(fn.addr);
-        if (!remote) {
-            log.e('invalid function', fn, remoteFunctions.get(fn.name));
-            return false;
+        let remote = remoteFunctions.get(fn.addr);
+        if (!remote || remote.size != fn.size) {
+            remote = remote || remoteFunctions.get(fn.name);
+            const diff = remote.addr - fn.addr;
+            log.e('invalid function', fn, remote, diff);
+            throw new Error(`invalid function ${fn.name}`);
         }
-        if (remote.size != fn.size) log.e('invalid function size', fn, remote);
     }
-    return true;
 }
-async function getFunctionsToTrace(rpc, libName, srclinePrefix) {
-    const module = await rpc.getModuleByName(libName);
-    log('module info from server', module);
-    const baseAddr = parseInt(module.base, 16);
-    const modulePath = getBinaryLocalPath(module);
-    let lib = new addon.ELFWrap(modulePath);
-    const localModuleInfo = lib.info();
-    log('module info from local addon', localModuleInfo);
-    const vaddr = isAndroid() ? localModuleInfo.vaddr : 0;
-    const buildIdLocal = localModuleInfo.buildId;
-    const buildIdRemote = module.buildId;
-    if (buildIdLocal != buildIdRemote) {
-        return log.e(`build id mismatch ${buildIdLocal} ${buildIdRemote}`);
+
+class Module {
+    static create(remoteModuleInfo) {
+        log.i('module info from server', remoteModuleInfo);
+        let lib = new addon.ELFWrap(remoteModuleInfo.path);
+        const localModuleInfo = lib.info();
+        log.i('module info from local addon', localModuleInfo);
+        if (localModuleInfo.buildId != remoteModuleInfo.buildId) {
+            throw new Error(`${remoteModuleInfo.name} buildId mismatch`);
+        }
+        remoteModuleInfo.vaddr = localModuleInfo.vaddr;
+        remoteModuleInfo.baseAddr = parseInt(remoteModuleInfo.base, 16);
+        return new Module(lib, remoteModuleInfo);
     }
-    const functions = lib.functions().filter(fn => fn.address && fn.size);
-    const debugInfo = new addon.DebugInfoWrap(lib);
-    const functionsToTrace = [];
-    for (const fn of functions) {
-        if (fn.name.includes('~')) continue;
-        const info = debugInfo.srcline(fn.address);
-        if (!info.src) {
-            log.w('no debug info', fn);
+    constructor(elf, info) {
+        this.elf = elf;
+        this.info = info;
+    }
+    release() {
+        this.elf.release();
+    }
+    getFunctions(srclinePrefix, name) {
+        const functions = this.elf.functions().filter(fn => fn.address && fn.size);
+        const debugInfo = new addon.DebugInfoWrap(this.elf);
+        const { baseAddr } = this.info;
+        const ret = [];
+        for (const fn of functions) {
+            const info = debugInfo.srcline(fn.address);
+            if (!info.src) {
+                log.w('no debug info', fn);
+                continue;
+            }
+            if (srclinePrefix && !info.src.startsWith(srclinePrefix)) continue;
+            fn.file = info.src;
+            fn.line = info.line;
+            fn.addr = fn.address + baseAddr;
+            ret.push(fn);
+        }
+        debugInfo.release();
+        return ret;
+    }
+};
+
+async function getFunctionsToTrace(rpc, libName, srclinePrefix) {
+    let functionsToTrace = [];
+    for (const lib of libName.split(',')) {
+        const remoteModule = await rpc.getModuleByName(lib);
+        const module = Module.create(remoteModule);
+        const fns = module.getFunctions(srclinePrefix);
+        module.release();
+        if (!fns) {
+            log.w('no functions to trace', lib);
             continue;
         }
-        info.file = info.src;
-        if (srclinePrefix && !info.file.startsWith(srclinePrefix)) continue;
-        fn.file = info.file;
-        fn.line = info.line;
-        const addr = fn.address - vaddr + baseAddr;
-        fn.addr = addr;
-        functionsToTrace.push(fn);
+        const remoteFunctions = await rpc.getFunctionsOfModule(lib);
+        validateFunctions(fns, remoteFunctions);
+        log.i(`collected ${fns.length} functions from ${lib}`);
+        functionsToTrace = fns.concat(functionsToTrace);
     }
-    debugInfo.release();
-    lib.release();
-    const modules = ['/system/lib64/libGLESv2.so', '/system/lib64/libEGL.so'];
-    await addImportedFunctions(rpc, libName, modules, functionsToTrace);
     if (functionsToTrace.length > Math.pow(2, 16)) {
-        log.e(`too many functions for uint16_t, ${functionsToTrace.length}`);
+        throw new Error(`too many functions for uint16_t, ${functionsToTrace.length}`);
     }
-    const remoteFunctions = await rpc.getFunctionsOfModule(libName);
-    validateFunctions(functionsToTrace, remoteFunctions);
     return functionsToTrace;
 }
 
@@ -209,16 +202,7 @@ async function main() {
     const targetProcess = await Process.getOrSpawn(deviceId, processName);
     const script = await targetProcess.attach(sourceFilename);
 
-    let functionsToTrace = [];
-    for (const lib of libName.split(',')) {
-        const fns = await getFunctionsToTrace(script, lib, srclinePrefix);
-        if (!fns) {
-            log.w('no functions to trace', lib);
-            continue;
-        }
-        log.i(`collected ${fns.length} functions from ${lib}`);
-        functionsToTrace = fns.concat(functionsToTrace);
-    }
+    const functionsToTrace = await getFunctionsToTrace(script, libName, srclinePrefix);
     await script.startTracing(functionsToTrace);
     await targetProcess.resume();
 
