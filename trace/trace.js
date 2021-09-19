@@ -139,7 +139,7 @@ class Process {
 
         const processes = await device.enumerateProcesses();
         const process = processes.find(p => p.name == name);
-        if (process.pid) return new Process(device, process.pid, name);
+        if (process) return new Process(device, process.pid, name);
 
         const pid = await device.spawn(path || name);
         if (pid) return new Process(device, pid, name, true);
