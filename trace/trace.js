@@ -6,43 +6,52 @@ const addon = require('./node-addon-api');
 
 let threadNames = new Map();
 let events = [];
-const stackByTid = new Map();
+class StackTrace {
+    static _stackByTid = new Map();
+    static getStackTrace(pid, tid) {
+        let stack = this._stackByTid.get(tid);
+        if (stack) return stack;
+        stack = new StackTrace(pid, tid);
+        this._stackByTid.set(tid, stack);
+        return stack;
+    }
+    constructor(pid, tid) {
+        this.pid = pid;
+        this.tid = tid;
+        this.frames = [];
+    }
+    addEvent(begin, addr, ts) {
+        if (begin) return this.frames.push({ addr, ts });
+
+        const e = this.frames.pop();
+        if (!e) return log.e('end-only event', addr, ts);
+
+        const duration = ts - e.ts;
+        events.push({ pid:this.pid, tid:this.tid, ph:'X', addr:e.addr, ts:e.ts, dur:duration });
+    }
+    finish(threadName) {
+        if (this.frames.length) log.e('begin-only events', this.frames);
+
+        threadNames.set(this.tid, threadName);
+        log.i(`thread ${this.tid}, ${threadName}`);
+    }
+}
 function onMessageFromDebuggee(msg, bytes) {
     const payload = msg.payload;
     if (!payload) return log.e(...arguments);
     if (payload.type === 'events') {
         const { pid, tid } = msg.payload;
-        const stack = stackByTid.get(Math.abs(tid)) || [];
+        const stack = StackTrace.getStackTrace(pid, Math.abs(tid));
         if (tid < 0) {
-            if (stack.length) {
-                log.w('begin-only events', stack);
-                events.push(...stack);
+            const threadName = bytes.toString('utf8').trim();
+            stack.finish(threadName);
+        } else {
+            for (let i = 0; i < bytes.length; ) {
+                const addr = Number(bytes.readUInt16LE(i)); i += 2;
+                const ts = Number(bytes.readInt32LE(i)); i += 4;
+                stack.addEvent(ts > 0, addr, Math.abs(ts));
             }
-            const name = bytes.toString('utf8').trim();
-            const id = -tid;
-            threadNames.set(id, name);
-            return log.i(`thread ${id} ${name}`);
         }
-        for (let i = 0; i < bytes.length; ) {
-            const addr = Number(bytes.readUInt16LE(i)); i += 2;
-            let ts = Number(bytes.readInt32LE(i)); i += 4;
-            const ph = ts > 0 ? 'B' : 'E';
-            ts = ts > 0 ? ts : -ts;
-            const event = { ph, tid, pid, addr, ts: ts };
-            if (ph == 'B') {
-                stack.push(event);
-                continue;
-            }
-            const beginEvent = stack.pop();
-            if (!beginEvent) {
-                log.e('end-only event', event);
-                continue;
-            }
-            beginEvent.dur = ts - beginEvent.ts;
-            beginEvent.ph = 'X';
-            events.push(beginEvent);
-        }
-        stackByTid.set(tid, stack);
     } else {
         log.e(`unkown msg`, ...arguments);
     }
