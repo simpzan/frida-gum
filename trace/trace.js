@@ -6,12 +6,18 @@ const addon = require('./node-addon-api');
 
 let threadNames = new Map();
 let events = [];
+const stackByTid = new Map();
 function onMessageFromDebuggee(msg, bytes) {
     const payload = msg.payload;
     if (!payload) return log.e(...arguments);
     if (payload.type === 'events') {
         const { pid, tid } = msg.payload;
+        const stack = stackByTid.get(Math.abs(tid)) || [];
         if (tid < 0) {
+            if (stack.length) {
+                log.w('begin-only events', stack);
+                events.push(...stack);
+            }
             const name = bytes.toString('utf8').trim();
             const id = -tid;
             threadNames.set(id, name);
@@ -23,9 +29,20 @@ function onMessageFromDebuggee(msg, bytes) {
             const ph = ts > 0 ? 'B' : 'E';
             ts = ts > 0 ? ts : -ts;
             const event = { ph, tid, pid, addr, ts: ts };
-            events.push(event);
-            // log.i(event);
+            if (ph == 'B') {
+                stack.push(event);
+                continue;
+            }
+            const beginEvent = stack.pop();
+            if (!beginEvent) {
+                log.e('end-only event', event);
+                continue;
+            }
+            beginEvent.dur = ts - beginEvent.ts;
+            beginEvent.ph = 'X';
+            events.push(beginEvent);
         }
+        stackByTid.set(tid, stack);
     } else {
         log.e(`unkown msg`, ...arguments);
     }
