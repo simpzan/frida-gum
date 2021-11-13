@@ -76,19 +76,17 @@ function writeChromeTracingFile(filename, functionMap) {
 }
 
 function validateFunctions(functionsLocal, functionsRemote) {
-    const remoteFunctions = new Map();
-    for (const fn of functionsRemote) {
-        const addr = fn.addr = parseInt(fn.address, 16);
-        remoteFunctions.set(addr, fn);
-        remoteFunctions.set(fn.name, fn);
-    }
+    const localFunctions = new Map();
     for (const fn of functionsLocal) {
-        let remote = remoteFunctions.get(fn.addr);
-        if (!remote || remote.size != fn.size) {
-            remote = remote || remoteFunctions.get(fn.name);
-            const diff = remote.addr - fn.addr;
-            log.e('invalid function', fn, remote, diff);
-            throw new Error(`invalid function ${fn.name}`);
+        localFunctions.set(fn.name, fn);
+    }
+    if (functionsRemote.length == 0) throw new Error('no remote functions to validate against');
+    for (const fn of functionsRemote) {
+        fn.addr = parseInt(fn.address, 16);
+        const local = localFunctions.get(fn.name);
+        if (!local || fn.addr != local.addr) {
+            log.e(fn, local);
+            throw new Error(`no matching function found, ${fn.name}`);
         }
     }
 }
@@ -114,7 +112,7 @@ class Module {
     release() {
         this.elf.release();
     }
-    getFunctions(srclinePrefix, name) {
+    getFunctions() {
         const functions = this.elf.functions().filter(fn => fn.address && fn.size);
         const debugInfo = new addon.DebugInfoWrap(this.elf);
         const { baseAddr } = this.info;
@@ -125,7 +123,6 @@ class Module {
                 log.w('no debug info', fn);
                 continue;
             }
-            if (srclinePrefix && !info.src.startsWith(srclinePrefix)) continue;
             fn.file = info.src;
             fn.line = info.line;
             fn.addr = fn.address + baseAddr;
@@ -141,7 +138,7 @@ async function getFunctionsToTrace(rpc, libName, srclinePrefix) {
     for (const lib of libName.split(',')) {
         const remoteModule = await rpc.getModuleByName(lib);
         const module = Module.create(remoteModule);
-        const fns = module.getFunctions(srclinePrefix);
+        let fns = module.getFunctions();
         module.release();
         if (!fns) {
             log.w('no functions to trace', lib);
@@ -149,6 +146,7 @@ async function getFunctionsToTrace(rpc, libName, srclinePrefix) {
         }
         const remoteFunctions = await rpc.getFunctionsOfModule(lib);
         validateFunctions(fns, remoteFunctions);
+        if (srclinePrefix) fns = fns.filter(fn => fn.file.startsWith(srclinePrefix));
         log.i(`collected ${fns.length} functions from ${lib}`);
         functionsToTrace = fns.concat(functionsToTrace);
     }
