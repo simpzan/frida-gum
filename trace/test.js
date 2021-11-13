@@ -98,6 +98,7 @@ rpc.exports = {
     getFunctionsOfModule(libName) {
         const module = Process.getModuleByName(libName);
         let functions = module.enumerateSymbols();
+        if (functions.length == 0) functions = module.enumerateExports();
         // log.d(module, functions);
         functions = functions.filter(s => {
             return s.type === 'function';
