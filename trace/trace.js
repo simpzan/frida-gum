@@ -244,4 +244,7 @@ async function main() {
     writeChromeTracingFile(`${libName}.json`, functionsToTrace);
     log.i('tracing done!');
 };
-main();
+main().catch(err => {
+    log.e(err);
+    process.exit(-1);
+});
