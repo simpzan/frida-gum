@@ -103,11 +103,13 @@ std::string demangle(const char *mangled_name) {
   free(realname);
   return res;
 }
-string getName(const dwarf::die &die) {
+string getName(const dwarf::die &die, bool demangled = true) {
   auto value = die.resolve(dwarf::DW_AT::linkage_name);
   if (!value.valid()) value = die.resolve(dwarf::DW_AT::name);
   if (!value.valid()) return "";
-  return demangle(value.as_string().c_str());
+  auto name = value.as_string();
+  if (!demangled) return name;
+  return demangle(name.c_str());
 }
 bool sameDie(const dwarf::die &die1, const dwarf::die &die2) {
   auto name1 = getName(die1);
@@ -153,8 +155,7 @@ void DebugInfo::loadDieR(const dwarf::die &die) {
 
   auto addr = at_low_pc(die);
   if (addr == 0) {
-    LOGI("low_pc is 0");
-    dumpDie(die);
+    LOGW("low_pc is 0, %s", getName(die, false).c_str());
     return;
   }
 
@@ -167,7 +168,12 @@ void DebugInfo::loadDieR(const dwarf::die &die) {
 }
 DebugInfo::DebugInfo(const ELF &elf): cus_(elf.dw_->compilation_units()) {
   for (auto &cu: cus_) loadDieR(cu.root());
-  LOGI("indexed %d dies, conflicts %d", (int)dies.size(), (int)conflictedDies.size());
+  int count = conflictedDies.size();
+  LOGI("indexed %d dies, conflicts %d", (int)dies.size(), count);
+  for (int i = 0; i < count; ++i) {
+    auto &die = conflictedDies[i];
+    LOGW("%d/%d %s", count, i+1, getName(die, false).c_str());
+  }
 }
 const dwarf::die DebugInfo::die(uint64_t addr) const {
   auto itr = dies.find(addr);
