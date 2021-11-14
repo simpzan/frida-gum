@@ -104,13 +104,11 @@ rpc.exports = {
     getImportedFunctions(libName) { return Module.enumerateImportsSync(libName); },
     getFunctionsOfModule(libName) {
         const module = Process.getModuleByName(libName);
-        let functions = module.enumerateSymbols();
-        if (functions.length == 0) functions = module.enumerateExports();
-        // log.d(module, functions);
+        let functions = module.enumerateExports();
         functions = functions.filter(s => {
             return s.type === 'function';
         });
-        log.i(`${libName} ${functions.length} functions`);
+        log.i(`${libName} ${functions.length} exported functions`);
         return functions;
     },
     startTracing(functions) {
