@@ -4,7 +4,7 @@ module.exports = {
     process: "screenrecord",
     modules: [
         { name: "screenrecord", src: "frameworks/av/cmds/screenrecord", function: "" },
-        { name: "libEGL.so", src: "", function: "" },
-        { name: "libGLESv2.so", src: "", function: "" },
+        { name: "libEGL.so", src: "", function: "egl" },
+        { name: "libGLESv2.so", src: "", function: "gl" },
     ]
 };

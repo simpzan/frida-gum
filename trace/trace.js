@@ -135,9 +135,10 @@ class Module {
     }
 };
 
-async function getFunctionsToTrace(rpc, libName, srclinePrefix) {
+async function getFunctionsToTrace(rpc, modules) {
     let functionsToTrace = [];
-    for (const lib of libName.split(',')) {
+    for (const rule of modules) {
+        const lib = rule.name;
         const remoteModule = await rpc.getModuleByName(lib);
         const module = Module.create(remoteModule);
         let fns = module.getFunctions();
@@ -148,7 +149,9 @@ async function getFunctionsToTrace(rpc, libName, srclinePrefix) {
         }
         const remoteFunctions = await rpc.getFunctionsOfModule(lib);
         validateFunctions(fns, remoteFunctions);
-        if (srclinePrefix) fns = fns.filter(fn => fn.file.startsWith(srclinePrefix));
+        if (rule.src) fns = fns.filter(fn => fn.file.startsWith(rule.src));
+        if (rule.function) fns = fns.filter(fn => fn.name.startsWith(rule.function));
+        // fns.forEach(fn => log.i(fn.name));
         fns = fns.filter(fn => fn.size > 4);
         fns.forEach(fn => fn.cat = lib);
         log.i(`collected ${fns.length} functions from ${lib}`);
@@ -225,14 +228,17 @@ async function main() {
     let deviceId = argv[2];
     let processName = argv[3] || "main";
     let libName = argv[4] || "libtest.so";
+    let modules = [];
     let srclinePrefix = argv[5];
     sysroot = argv[6] || sysroot;
     if (!deviceId) {
         const args = require("./args.js");
         deviceId = args.device;
         processName = args.process;
-        libName = args.modules.map(m => m.name).join(',');
+        modules = args.modules;
         sysroot = args.sysroot;
+    } else {
+        modules = [ { name: libName, src: srclinePrefix } ];
     }
 
     const sourceFilename = "./test.js";
@@ -240,7 +246,7 @@ async function main() {
     const targetProcess = await Process.getOrSpawn(deviceId, processName);
     const script = await targetProcess.attach(sourceFilename);
 
-    const functionsToTrace = await getFunctionsToTrace(script, libName, srclinePrefix);
+    const functionsToTrace = await getFunctionsToTrace(script, modules);
     await script.startTracing(functionsToTrace);
     await targetProcess.resume();
 
@@ -251,7 +257,7 @@ async function main() {
 
     if (!events.length) return log.i('no trace data.');
 
-    writeChromeTracingFile(`${libName}.json`, functionsToTrace);
+    writeChromeTracingFile(`${processName}.json`, functionsToTrace);
     log.i('tracing done!');
 };
 main().catch(err => {
