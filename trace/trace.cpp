@@ -45,6 +45,14 @@ int getBuildId(const char *name, char *bytes, int length) {
   return min(length, datalen);
 }
 
+int isAndroid() {
+#ifdef __ANDROID__
+  return 1;
+#else
+  return 0;
+#endif
+}
+
 }
 
 static inline std::string readFile(const char *filename) {

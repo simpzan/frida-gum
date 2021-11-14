@@ -101,8 +101,10 @@ class Module {
         if (localModuleInfo.buildId != remoteModuleInfo.buildId) {
             throw new Error(`${remoteModuleInfo.name} buildId mismatch`);
         }
-        remoteModuleInfo.vaddr = localModuleInfo.vaddr;
-        remoteModuleInfo.baseAddr = parseInt(remoteModuleInfo.base, 16);
+        let base = parseInt(remoteModuleInfo.base, 16);
+        // vaddr is not included in baseAddr on android.
+        if (remoteModuleInfo.isAndroid) base -= localModuleInfo.vaddr;
+        remoteModuleInfo.baseAddr = base;
         return new Module(lib, remoteModuleInfo);
     }
     constructor(elf, info) {

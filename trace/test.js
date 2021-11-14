@@ -24,6 +24,12 @@ function getNativeFunction(module, name, argumentTypes = [], returnType = 'void'
     return fn;
 }
 
+function isAndroid() {
+    const fnAddr = Module.getExportByName('libtrace.so', 'isAndroid');
+    const isAndroid_ = new NativeFunction(fnAddr, 'int', []);
+    return isAndroid_() == 1;
+}
+
 function getBuildId(soPath) {
     const getBuidId_addr = Module.getExportByName('libtrace.so', 'getBuildId');
     const getBuildId = new NativeFunction(getBuidId_addr, 'int', ['pointer', 'pointer', 'int']);
@@ -92,6 +98,7 @@ rpc.exports = {
         Module.load(libName);
         const module = Process.getModuleByName(libName);
         module.buildId = getBuildId(module.path);
+        module.isAndroid = isAndroid();
         return module;
     },
     getImportedFunctions(libName) { return Module.enumerateImportsSync(libName); },
