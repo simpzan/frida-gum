@@ -64,6 +64,7 @@ function writeChromeTracingFile(filename, functionMap) {
         const fn = functionMap[trace.addr]
         if (!fn) return log.e(`can't find function info for event`, trace);
         trace.name = fn.demangledName = fn.demangledName || addon.demangleCppName(fn.name);
+        trace.cat = fn.cat;
         traceFile.writeObject(trace);
     }
     const pid = events[0].pid;
@@ -150,6 +151,7 @@ async function getFunctionsToTrace(rpc, libName, srclinePrefix) {
         validateFunctions(fns, remoteFunctions);
         if (srclinePrefix) fns = fns.filter(fn => fn.file.startsWith(srclinePrefix));
         fns = fns.filter(fn => fn.size > 4);
+        fns.forEach(fn => fn.cat = lib);
         log.i(`collected ${fns.length} functions from ${lib}`);
         functionsToTrace = fns.concat(functionsToTrace);
     }
