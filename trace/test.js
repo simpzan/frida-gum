@@ -20,8 +20,7 @@ global.log = log;
 
 function getNativeFunction(module, name, argumentTypes = [], returnType = 'void') {
     const ptr = module.getExportByName(name);
-    const fn = new NativeFunction(ptr, returnType, argumentTypes);
-    return fn;
+    return new NativeFunction(ptr, returnType, argumentTypes);
 }
 
 function isAndroid() {
@@ -105,9 +104,7 @@ rpc.exports = {
     getFunctionsOfModule(libName) {
         const module = Process.getModuleByName(libName);
         let functions = module.enumerateExports();
-        functions = functions.filter(s => {
-            return s.type === 'function';
-        });
+        functions = functions.filter(s => s.type === 'function');
         log.i(`${libName} ${functions.length} exported functions`);
         return functions;
     },

@@ -78,9 +78,8 @@ function writeChromeTracingFile(filename, functionMap) {
 
 function validateFunctions(functionsLocal, functionsRemote) {
     const localFunctions = new Map();
-    for (const fn of functionsLocal) {
-        localFunctions.set(fn.name, fn);
-    }
+    for (const fn of functionsLocal) localFunctions.set(fn.name, fn);
+
     if (functionsRemote.length == 0) throw new Error('no remote functions to validate against');
     for (const fn of functionsRemote) {
         fn.addr = parseInt(fn.address, 16);
