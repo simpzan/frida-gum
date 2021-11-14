@@ -73,9 +73,9 @@ class Tracer {
     }
     traceFunctions(functions) {
         functions.forEach((fn, index) => {
-            const addr = new NativePointer(fn.addr);
-            const functionId = new NativePointer(index);
             try {
+                const addr = new NativePointer(fn.addr);
+                const functionId = new NativePointer(index);
                 Interceptor.attach(addr, this.attachCallbacks, functionId);
             } catch (error) {
                 log.e('attach failed', error.toString(), JSON.stringify(fn));
@@ -100,7 +100,9 @@ rpc.exports = {
         module.isAndroid = isAndroid();
         return module;
     },
-    getImportedFunctions(libName) { return Module.enumerateImportsSync(libName); },
+    getImportedFunctions(libName) {
+        return Module.enumerateImportsSync(libName).filter(fn => fn.type === 'function');
+    },
     getFunctionsOfModule(libName) {
         const module = Process.getModuleByName(libName);
         let functions = module.enumerateExports();

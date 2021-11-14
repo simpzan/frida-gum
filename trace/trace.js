@@ -1,4 +1,5 @@
 const fs = require('fs');
+const path = require('path');
 const utils = require('./utils.js');
 const fridaDir = process.platform == 'darwin' ? 'frida-macos-x86_64' : 'frida_thin-linux-x86_64';
 const frida = require(`../../build/${fridaDir}/lib/node_modules/frida`);
@@ -155,7 +156,11 @@ async function getFunctionsToTrace(rpc, modules) {
         fns = fns.filter(fn => fn.size > 4);
         fns.forEach(fn => fn.cat = lib);
         log.i(`collected ${fns.length} functions from ${lib}`);
-        functionsToTrace = fns.concat(functionsToTrace);
+        functionsToTrace = functionsToTrace.concat(fns);
+        if (rule.imported) {
+            const imported = await rpc.getImportedFunctions(lib, rule.imported);
+            functionsToTrace = functionsToTrace.concat(imported);
+        }
     }
     if (functionsToTrace.length > Math.pow(2, 16)) {
         throw new Error(`too many functions for uint16_t, ${functionsToTrace.length}`);
@@ -216,8 +221,23 @@ class Script {
     async getFunctionsOfModule(libName) {
         return await this.script.exports.getFunctionsOfModule(libName);
     }
-    async getImportedFunctions(libName) {
-        return await this.script.exports.getImportedFunctions(libName);
+    async getImportedFunctions(libName, libs) {
+        const imported = await this.script.exports.getImportedFunctions(libName);
+        const functionsByModule = {};
+        for (const fn of imported) {
+            const lib = path.basename(fn.module, '.so');
+            fn.addr = parseInt(fn.address, 16);
+            fn.cat = lib;
+            const fns = functionsByModule[lib] || [];
+            fns.push(fn);
+            functionsByModule[lib] = fns;
+        }
+        return libs.map(lib => {
+            const fns = functionsByModule[lib] || [];
+            log.i(`collected imported functions ${fns.length} from ${lib}`);
+            // for (const fn of fns) log.d(fn.name);
+            return fns;
+        }).flat();
     }
 };
 
