@@ -218,11 +218,19 @@ async function main() {
     const argv = process.argv;
     log.i("argv", argv);
 
-    const deviceId = argv[2];
-    const processName = argv[3] || "main";
-    const libName = argv[4] || "libtest.so";
-    const srclinePrefix = argv[5];
+    let deviceId = argv[2];
+    let processName = argv[3] || "main";
+    let libName = argv[4] || "libtest.so";
+    let srclinePrefix = argv[5];
     sysroot = argv[6] || sysroot;
+    if (!deviceId) {
+        const args = require("./args.js");
+        deviceId = args.device;
+        processName = args.process;
+        libName = args.modules.map(m => m.name).join(',');
+        sysroot = args.sysroot;
+    }
+
     const sourceFilename = "./test.js";
 
     const targetProcess = await Process.getOrSpawn(deviceId, processName);
