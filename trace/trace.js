@@ -147,6 +147,7 @@ async function getFunctionsToTrace(rpc, libName, srclinePrefix) {
         const remoteFunctions = await rpc.getFunctionsOfModule(lib);
         validateFunctions(fns, remoteFunctions);
         if (srclinePrefix) fns = fns.filter(fn => fn.file.startsWith(srclinePrefix));
+        fns = fns.filter(fn => fn.size > 4);
         log.i(`collected ${fns.length} functions from ${lib}`);
         functionsToTrace = fns.concat(functionsToTrace);
     }
