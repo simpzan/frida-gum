@@ -137,7 +137,7 @@ class Module {
 };
 
 async function getFunctionsToTrace(rpc, modules) {
-    let functionsToTrace = [];
+    let functions = {};
     for (const rule of modules) {
         const lib = rule.name;
         const remoteModule = await rpc.getModuleByName(lib);
@@ -156,12 +156,14 @@ async function getFunctionsToTrace(rpc, modules) {
         fns = fns.filter(fn => fn.size > 4);
         fns.forEach(fn => fn.cat = lib);
         log.i(`collected ${fns.length} functions from ${lib}`);
-        functionsToTrace = functionsToTrace.concat(fns);
+        for (const fn of fns) functions[fn.addr] = fn;
         if (rule.imported) {
             const imported = await rpc.getImportedFunctions(lib, rule.imported);
-            functionsToTrace = functionsToTrace.concat(imported);
+            log.i(`collected ${imported.length} imported functions`);
+            for (const fn of imported) functions[fn.addr] = fn;
         }
     }
+    const functionsToTrace = Object.values(functions);
     if (functionsToTrace.length > Math.pow(2, 16)) {
         throw new Error(`too many functions for uint16_t, ${functionsToTrace.length}`);
     }
