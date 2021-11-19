@@ -66,10 +66,14 @@ function traceJavaMethods(groups) {
         const factory = Java.ClassFactory.get(loader);
         for (const [ className, methods ] of classes) {
             let klass = factory.use(className);
-            for (const [ method, _ ] of methods) {
-                const overloads = klass[method].overloads;
-                const infos = traceJavaMethod(overloads, ret.length);
-                mergeArray(ret, infos);
+            for (const [ method ] of methods) {
+                try {
+                    const overloads = klass[method].overloads;
+                    const infos = traceJavaMethod(overloads, ret.length);
+                    mergeArray(ret, infos);
+                } catch (err) {
+                    log.e(err.toString(), method, className);
+                }
             }
         }
     }
@@ -93,7 +97,7 @@ function updateGroups(ret, spec) {
 
 Java.perform(() => {
     const specs = [
-        { name: "android.app.Activity!*", act: "+" },
+        { name: "android.app.LoaderManagerImpl!*", act: "+" },
         // { name: "android.app.Activity!startActivityForResult*", act: "-" },
         { name: 'com.example.myapplication.*!*', act: "+" },
     ];
