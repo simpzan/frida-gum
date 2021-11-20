@@ -166,10 +166,11 @@ function updateGroups(ret, spec) {
 }
 function traceJava(specs) {
     log.i('specs', specs);
+    if (!specs.length) return [];
     let javaMethods = [];
     Java.perform(() => {
         const methods2Trace = new Map(); // structure: loader.class.method.id
-        for (const spec of specs) if (spec.type === 'java') updateGroups(methods2Trace, spec);
+        for (const spec of specs) updateGroups(methods2Trace, spec);
         javaMethods = traceJavaMethods(methods2Trace);
         log.i('java functions', javaMethods.length);
     });
@@ -194,9 +195,9 @@ rpc.exports = {
         log.i(`${libName} ${functions.length} exported functions`);
         return functions;
     },
-    startTracing(functions, specs) {
+    startTracing(functions, javaSpec) {
         log.i(`startTracing`)
-        const javaMethods = traceJava(specs);
+        const javaMethods = traceJava(javaSpec);
         const javaCount = javaMethods.length, nativeCount = functions.length;
         const total = javaCount + nativeCount;
         if (total > Math.pow(2, 16)) {

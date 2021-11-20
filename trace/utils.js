@@ -88,6 +88,16 @@ function getThreadNames(pid, tids) {
 }
 module.exports = { delay, StdIn, saveObject, loadObject, getThreadNames, makeMap, runCmd };
 
+function partitionArray(array, predicate) {
+    const ret = { true: [], false: [] };
+    for (const e of array) {
+        const ok = !!predicate(e);
+        ret[ok].push(e);
+    }
+    return ret;
+}
+module.exports.partitionArray = partitionArray;
+
 class ChromeTracingFile {
     constructor(filename) {
         this.sink = fs.createWriteStream(filename);

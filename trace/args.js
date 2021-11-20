@@ -2,6 +2,9 @@ module.exports = {
     device: "94AAY0LLTM",
     sysroot: "/home/simpzan/blueline/aosp_9_r12/out/target/product/generic_arm64/symbols/",
     processes: {
+        "screenrecord": [
+            { name: "screenrecord", src: "", function: "" },
+        ],
         "system_server": [
             // { name: "screenrecord", src: "frameworks/av/cmds/screenrecord", function: "", imported: [
             //     "libstagefright", "libmedia_omx", "libgui", "libEGL", "libGLESv2" ] },

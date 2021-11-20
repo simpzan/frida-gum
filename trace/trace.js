@@ -270,10 +270,9 @@ async function main() {
 
         sharedBaseTimestamp = await script.getOrSetBaseTimestamp(sharedBaseTimestamp);
 
-        const modules = processes[processName]
-        const nativeSpecs = modules.filter(m => m.type !== 'java');
-        const functionsToTrace = await getFunctionsToTrace(script, nativeSpecs);
-        const javaMethods = await script.startTracing(functionsToTrace, modules);
+        const specs = utils.partitionArray(processes[processName], s => s.type === 'java');
+        const functionsToTrace = await getFunctionsToTrace(script, specs[false]);
+        const javaMethods = await script.startTracing(functionsToTrace, specs[true]);
         const allFunctionsTraced = javaMethods.concat(functionsToTrace);
         allFunctionsTracedByPid[pid] = allFunctionsTraced;
     }
