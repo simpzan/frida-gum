@@ -63,7 +63,7 @@ function writeChromeTracingFile(filename, functionMap) {
     log.i(`writing chrome tracing file ${filename}`);
     const traceFile = new utils.ChromeTracingFile(filename);
     for (const trace of events) {
-        const fn = functionMap[trace.addr]
+        const fn = functionMap[trace.pid][trace.addr];
         if (!fn) return log.e(`can't find function info for event`, trace);
         if (fn.method) trace.name = fn.method;
         else trace.name = fn.demangledName = fn.demangledName || addon.demangleCppName(fn.name);
@@ -249,41 +249,43 @@ async function main() {
     const argv = process.argv;
     log.i("argv", argv);
 
-    let deviceId = argv[2];
-    let processName = argv[3] || "main";
-    let libName = argv[4] || "libtest.so";
-    let modules = [];
-    let srclinePrefix = argv[5];
-    sysroot = argv[6] || sysroot;
-    if (!deviceId) {
-        const args = require("./args.js");
-        deviceId = args.device;
-        processName = args.process;
-        modules = args.modules;
-        sysroot = args.sysroot;
-    } else {
-        modules = [ { name: libName, src: srclinePrefix } ];
-    }
-
+    const configFile = argv[2];
+    const config = require(configFile);
+    sysroot = config.sysroot;
+    const deviceId = config.device;
     const sourceFilename = "./test.js";
+    const processes = config.processes;
 
-    const targetProcess = await Process.getOrSpawn(deviceId, processName);
-    const script = await targetProcess.attach(sourceFilename);
+    const traceProcesses = {};
+    const allFunctionsTracedByPid = {};
+    for (const processName in processes) {
+        const targetProcess = await Process.getOrSpawn(deviceId, processName);
+        const script = await targetProcess.attach(sourceFilename);
+        const pid = targetProcess.pid;
+        traceProcesses[pid] = { pid, targetProcess, script, name: processName };
 
-    const nativeSpecs = modules.filter(m => m.type !== 'java');
-    const functionsToTrace = await getFunctionsToTrace(script, nativeSpecs);
-    const javaMethods = await script.startTracing(functionsToTrace, modules);
-    const allFunctionsTraced = javaMethods.concat(functionsToTrace);
-    await targetProcess.resume();
+        const modules = processes[processName]
+        const nativeSpecs = modules.filter(m => m.type !== 'java');
+        const functionsToTrace = await getFunctionsToTrace(script, nativeSpecs);
+        const javaMethods = await script.startTracing(functionsToTrace, modules);
+        const allFunctionsTraced = javaMethods.concat(functionsToTrace);
+        allFunctionsTracedByPid[pid] = allFunctionsTraced;
+    }
+    for (const process of Object.values(traceProcesses)) {
+        await process.targetProcess.resume();
+        log.i(process.pid, process.name);
+    }
 
     log.i('Tracing started, press enter to stop.');
     await utils.StdIn.readline();
 
-    await script.stopTracing();
+    for (const process of Object.values(traceProcesses)) {
+        await process.script.stopTracing();
+    }
 
     if (!events.length) return log.i('no trace data.');
 
-    writeChromeTracingFile(`${processName}.json`, allFunctionsTraced);
+    writeChromeTracingFile(`${deviceId}.json`, allFunctionsTracedByPid);
     log.i('tracing done!');
 };
 main().catch(err => {
