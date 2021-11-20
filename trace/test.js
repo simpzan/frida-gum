@@ -93,6 +93,92 @@ class Tracer {
 }
 const tracer = new Tracer();
 
+
+function mapGetOrCreate(map, key) {
+    let value = map.get(key);
+    if (value) return value;
+    value = new Map();
+    map.set(key, value);
+    return value;
+}
+function mergeArray(to, from) {
+    for (const e of from) to.push(e);
+}
+function getMethodInfo(id, method, includeArgs) {
+    const ret = { id, "class": method.holder.$className, "method": method.methodName };
+    if (includeArgs) ret.args = method.argumentTypes.map(a => a.className);
+    return ret;
+}
+let javaMethods = null;
+function traceJavaEvent(addr, ts) {
+    const dur = Date.now() - ts;
+    const tid = gettid();
+    send({ type:'javaEvents', tid, pid, addr, ts, dur });
+}
+
+function traceJavaMethod(overloads, methodId) {
+    const methods = [];
+    const includeArgs = overloads.length > 1;
+    for (const method of overloads) {
+        const id = methodId++;
+        const info = getMethodInfo(id, method, includeArgs);
+        methods.push(info);
+        log.i("tracing", info);
+        method.implementation = function() {
+            const ts = Date.now();
+            const ret = method.apply(this, arguments);
+            traceJavaEvent(id, ts);
+            return ret;
+        }
+    }
+    return methods;
+}
+function traceJavaMethods(groups) {
+    const ret = [];
+    for (const [ loader, classes ] of groups) {
+        const factory = Java.ClassFactory.get(loader);
+        for (const [ className, methods ] of classes) {
+            let klass = factory.use(className);
+            for (const [ method ] of methods) {
+                try {
+                    const overloads = klass[method].overloads;
+                    const infos = traceJavaMethod(overloads, ret.length);
+                    mergeArray(ret, infos);
+                } catch (err) {
+                    log.e(err.toString(), method, className);
+                }
+            }
+        }
+    }
+    return ret;
+}
+function updateGroups(ret, spec) {
+    const groups = Java.enumerateMethods(spec.name);
+    const add = spec.act === "+";
+    for (const group of groups) {
+        const classes = mapGetOrCreate(ret, group.loader);
+        for (const klass of group.classes) {
+            const methods = mapGetOrCreate(classes, klass.name);
+            for (const method of klass.methods) {
+                // log.d(add, klass.name, method);
+                if (add) methods.set(method, null);
+                else methods.delete(method);
+            }
+        }
+    }
+}
+function traceJava(specs) {
+    log.i('specs', specs);
+    Java.perform(() => {
+        const methods2Trace = new Map(); // structure: loader.class.method.id
+        for (const spec of specs) if (spec.type === 'java') updateGroups(methods2Trace, spec);
+        const functions = traceJavaMethods(methods2Trace);
+        javaMethods = functions;
+        log.i('java functions', functions.length);
+    });
+    return javaMethods;
+}
+
 rpc.exports = {
     getModuleByName(libName) {
         Module.load(libName);
@@ -111,9 +197,10 @@ rpc.exports = {
         log.i(`${libName} ${functions.length} exported functions`);
         return functions;
     },
-    startTracing(functions) {
+    startTracing(functions, specs) {
         log.i(`startTracing`)
         tracer.traceFunctions(functions);
+        return traceJava(specs);
     },
     stopTracing() {
         tracer.exit();
