@@ -53,6 +53,8 @@ int isAndroid() {
 #endif
 }
 
+uint64_t getThreadId() { return gettid(); }
+
 }
 
 static inline std::string readFile(const char *filename) {

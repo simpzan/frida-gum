@@ -40,7 +40,7 @@ function getBuildId(soPath) {
     log.e(`failed to getBuildId(${soPath}): ${size}`);
     return "";
 }
-
+let gettid = null;
 function loadLibTrace(path, callback) {
     const module = Module.load(path);
     const sendDataFn = module.getExportByName('_sendDataFn');
@@ -48,6 +48,7 @@ function loadLibTrace(path, callback) {
     log.d(`sendData ${sendData}`);
     sendDataFn.writePointer(sendData);
     const flushAll = getNativeFunction(module, 'flushAll');
+    gettid = getNativeFunction(module, 'getThreadId', [], 'uint64');
 
     const attachCallbacks = {
         onEnter: module.getExportByName('onEnter'),
