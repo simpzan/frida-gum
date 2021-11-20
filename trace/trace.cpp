@@ -109,9 +109,9 @@ struct EventBuffer {
     free(events); events = NULL;
     TRACE();
   }
-  void write(gpointer fn, int32_t ts) {
+  void write(uint16_t fn, int32_t ts) {
     auto event = events + current;
-    event->fn = (uint16_t)GPOINTER_TO_SIZE(fn);
+    event->fn = fn;
     event->ts = ts;
     ++current;
     if (current == count) flush();
@@ -136,11 +136,13 @@ struct EventBuffer {
 };
 
 thread_local EventBuffer buffer;
-void recordEvent(GumInvocationContext *ic, int ph) {
-  gpointer fn = gum_invocation_context_get_listener_function_data(ic);
+extern "C" void recordTraceEvent(uint16_t fn, int32_t ph) {
   int32_t ts = getRelativeTimestamp() * ph;
-  // INFO("%p %ld", fn, ts);
   buffer.write(fn, ts);
+}
+static inline void recordEvent(GumInvocationContext *ic, int ph) {
+  gpointer fn = gum_invocation_context_get_listener_function_data(ic);
+  recordTraceEvent((uint16_t)GPOINTER_TO_SIZE(fn), ph);
 }
 extern "C" void onEnter(GumInvocationContext * ic) { recordEvent(ic, 1); }
 extern "C" void onLeave(GumInvocationContext * ic) { recordEvent(ic, -1); }
