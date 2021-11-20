@@ -7,7 +7,6 @@ const addon = require('./node-addon-api');
 
 let threadNames = new Map();
 let events = [];
-const javaEvents = [];
 class StackTrace {
     static _stackByTid = new Map();
     static getStackTrace(pid, tid) {
@@ -54,32 +53,23 @@ function onMessageFromDebuggee(msg, bytes) {
                 stack.addEvent(ts > 0, addr, Math.abs(ts));
             }
         }
-    } else if (payload.type === 'javaEvents') {
-        // log.i('payload', payload);
-        javaEvents.push(payload);
     } else {
         log.e(`unkown msg`, ...arguments);
     }
 }
 
-function writeChromeTracingFile(filename, functionMap, javaMethods) {
+function writeChromeTracingFile(filename, functionMap) {
     log.i(`writing chrome tracing file ${filename}`);
     const traceFile = new utils.ChromeTracingFile(filename);
     for (const trace of events) {
         const fn = functionMap[trace.addr]
         if (!fn) return log.e(`can't find function info for event`, trace);
-        trace.name = fn.demangledName = fn.demangledName || addon.demangleCppName(fn.name);
-        trace.cat = fn.cat;
+        if (fn.method) trace.name = fn.method;
+        else trace.name = fn.demangledName = fn.demangledName || addon.demangleCppName(fn.name);
+        trace.cat = fn.cat || fn.class;
         traceFile.writeObject(trace);
     }
-    for (const event of javaEvents) {
-        const method = javaMethods[event.addr];
-        event.name = `${method.class}.${method.method}`;
-        delete event.type;
-        event.ph = 'X';
-        traceFile.writeObject(event);
-    }
-    const pid = (events[0] || javaEvents[0]).pid;
+    const pid = (events[0]).pid;
     for (const [tid, threadName] of threadNames) {
         const name = `${threadName}/${tid}`;
         const entry = {"ts":0, "ph":"M", "name":"thread_name", pid, tid, "args":{name}};
@@ -282,6 +272,7 @@ async function main() {
     const nativeSpecs = modules.filter(m => m.type !== 'java');
     const functionsToTrace = await getFunctionsToTrace(script, nativeSpecs);
     const javaMethods = await script.startTracing(functionsToTrace, modules);
+    const allFunctionsTraced = javaMethods.concat(functionsToTrace);
     await targetProcess.resume();
 
     log.i('Tracing started, press enter to stop.');
@@ -289,9 +280,9 @@ async function main() {
 
     await script.stopTracing();
 
-    if (!events.length && !javaEvents.length) return log.i('no trace data.');
+    if (!events.length) return log.i('no trace data.');
 
-    writeChromeTracingFile(`${processName}.json`, functionsToTrace, javaMethods);
+    writeChromeTracingFile(`${processName}.json`, allFunctionsTraced);
     log.i('tracing done!');
 };
 main().catch(err => {

@@ -41,6 +41,7 @@ function getBuildId(soPath) {
     return "";
 }
 let gettid = null;
+let recordTraceEvent = null;
 function loadLibTrace(path, callback) {
     const module = Module.load(path);
     const sendDataFn = module.getExportByName('_sendDataFn');
@@ -49,6 +50,7 @@ function loadLibTrace(path, callback) {
     sendDataFn.writePointer(sendData);
     const flushAll = getNativeFunction(module, 'flushAll');
     gettid = getNativeFunction(module, 'getThreadId', [], 'uint64');
+    recordTraceEvent = getNativeFunction(module, 'recordTraceEvent', ['uint16', 'int32']);
 
     const attachCallbacks = {
         onEnter: module.getExportByName('onEnter'),
@@ -72,11 +74,11 @@ class Tracer {
         const libtracePath = 'libtrace.so';
         this.attachCallbacks = loadLibTrace(libtracePath, onTraceEvent);
     }
-    traceFunctions(functions) {
+    traceFunctions(functions, baseId = 0) {
         functions.forEach((fn, index) => {
             try {
                 const addr = new NativePointer(fn.addr);
-                const functionId = new NativePointer(index);
+                const functionId = new NativePointer(index + baseId);
                 Interceptor.attach(addr, this.attachCallbacks, functionId);
             } catch (error) {
                 log.e('attach failed', error.toString(), JSON.stringify(fn));
@@ -109,12 +111,6 @@ function getMethodInfo(id, method, includeArgs) {
     if (includeArgs) ret.args = method.argumentTypes.map(a => a.className);
     return ret;
 }
-let javaMethods = null;
-function traceJavaEvent(addr, ts) {
-    const dur = Date.now() - ts;
-    const tid = gettid();
-    send({ type:'javaEvents', tid, pid, addr, ts, dur });
-}
 
 function traceJavaMethod(overloads, methodId) {
     const methods = [];
@@ -125,9 +121,9 @@ function traceJavaMethod(overloads, methodId) {
         methods.push(info);
         log.i("tracing", info);
         method.implementation = function() {
-            const ts = Date.now();
+            recordTraceEvent(id, 1);
             const ret = method.apply(this, arguments);
-            traceJavaEvent(id, ts);
+            recordTraceEvent(id, -1);
             return ret;
         }
     }
@@ -169,12 +165,12 @@ function updateGroups(ret, spec) {
 }
 function traceJava(specs) {
     log.i('specs', specs);
+    let javaMethods = [];
     Java.perform(() => {
         const methods2Trace = new Map(); // structure: loader.class.method.id
         for (const spec of specs) if (spec.type === 'java') updateGroups(methods2Trace, spec);
-        const functions = traceJavaMethods(methods2Trace);
-        javaMethods = functions;
-        log.i('java functions', functions.length);
+        javaMethods = traceJavaMethods(methods2Trace);
+        log.i('java functions', javaMethods.length);
     });
     return javaMethods;
 }
@@ -199,8 +195,15 @@ rpc.exports = {
     },
     startTracing(functions, specs) {
         log.i(`startTracing`)
-        tracer.traceFunctions(functions);
-        return traceJava(specs);
+        const javaMethods = traceJava(specs);
+        const javaCount = javaMethods.length, nativeCount = functions.length;
+        const total = javaCount + nativeCount;
+        if (total > Math.pow(2, 16)) {
+            const stats = `total ${total}, java ${javaCount}, native ${nativeCount}`;
+            throw new Error(`too many functions for uint16_t, ${stats}`);
+        }
+        tracer.traceFunctions(functions, javaCount);
+        return javaMethods;
     },
     stopTracing() {
         tracer.exit();
