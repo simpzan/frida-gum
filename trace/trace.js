@@ -33,7 +33,8 @@ class StackTrace {
     finish(threadName) {
         if (this.frames.length) log.e('begin-only events', this.frames);
 
-        threadNames.set(this.tid, threadName);
+        const threadInfo = { threadName, pid:this.pid, tid:this.tid };
+        threadNames.set(this.tid, threadInfo);
         log.i(`thread ${this.tid}, ${threadName}`);
     }
 }
@@ -69,8 +70,8 @@ function writeChromeTracingFile(filename, functionMap) {
         trace.cat = fn.cat || fn.class;
         traceFile.writeObject(trace);
     }
-    const pid = (events[0]).pid;
-    for (const [tid, threadName] of threadNames) {
+    for (const [tid, info] of threadNames) {
+        const { pid, threadName } = info;
         const name = `${threadName}/${tid}`;
         const entry = {"ts":0, "ph":"M", "name":"thread_name", pid, tid, "args":{name}};
         traceFile.writeObject(entry);
