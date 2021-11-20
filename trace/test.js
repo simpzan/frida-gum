@@ -1,12 +1,11 @@
 const pid = Process.id;
 function log(level, ...args) {
     let e = new Error();
-    let frame = e.stack.split("\n")[2]; // change to 3 for grandparent func
-    let lineNumber = frame.split(":").reverse()[1];
-    let functionName = frame.split(" ")[5];
+    let frame = e.stack.split("\n")[2].trim().substr(3); // change to 3 for grandparent func
     const time = Date.now() / 1000;
-    const srcline = `${time.toFixed(3)} ${level} ${pid} ${functionName}:${lineNumber}\t`;
-    console.log(srcline, ...args);
+    const srcline = `${time.toFixed(3)} ${level} ${pid} ${frame}\t`;
+    const text = args.map(a => JSON.stringify(a)).join(', ');
+    console.log(srcline, text);
 }
 const noop = () => {};
 log.e = log.bind(null, "E");
