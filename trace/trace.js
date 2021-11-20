@@ -225,6 +225,9 @@ class Script {
     async getFunctionsOfModule(libName) {
         return await this.script.exports.getFunctionsOfModule(libName);
     }
+    async getOrSetBaseTimestamp(ts) {
+        return await this.script.exports.getOrSetBaseTimestamp(ts);
+    }
     async getImportedFunctions(libName, libs) {
         const imported = await this.script.exports.getImportedFunctions(libName);
         const functionsByModule = {};
@@ -256,6 +259,7 @@ async function main() {
     const sourceFilename = "./test.js";
     const processes = config.processes;
 
+    let sharedBaseTimestamp = 0;
     const traceProcesses = {};
     const allFunctionsTracedByPid = {};
     for (const processName in processes) {
@@ -263,6 +267,8 @@ async function main() {
         const script = await targetProcess.attach(sourceFilename);
         const pid = targetProcess.pid;
         traceProcesses[pid] = { pid, targetProcess, script, name: processName };
+
+        sharedBaseTimestamp = await script.getOrSetBaseTimestamp(sharedBaseTimestamp);
 
         const modules = processes[processName]
         const nativeSpecs = modules.filter(m => m.type !== 'java');

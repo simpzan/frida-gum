@@ -92,6 +92,10 @@ static gint64 baseTimestamp = 0;
 static inline uint32_t getRelativeTimestamp() {
   return g_get_real_time() - baseTimestamp;
 }
+extern "C" void setBaseTimestamp(int64_t ts) {
+  baseTimestamp = ts;
+  INFO("baseTimestamp %f", baseTimestamp/1000000.0);
+}
 
 struct EventBuffer {
   EventBuffer() {

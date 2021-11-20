@@ -41,6 +41,7 @@ function getBuildId(soPath) {
 }
 let gettid = null;
 let recordTraceEvent = null;
+let setBaseTimestamp = null;
 function loadLibTrace(path, callback) {
     const module = Module.load(path);
     const sendDataFn = module.getExportByName('_sendDataFn');
@@ -50,6 +51,7 @@ function loadLibTrace(path, callback) {
     const flushAll = getNativeFunction(module, 'flushAll');
     gettid = getNativeFunction(module, 'getThreadId', [], 'uint64');
     recordTraceEvent = getNativeFunction(module, 'recordTraceEvent', ['uint16', 'int32']);
+    setBaseTimestamp = getNativeFunction(module, 'setBaseTimestamp', ['int64']);
 
     const attachCallbacks = {
         onEnter: module.getExportByName('onEnter'),
@@ -206,5 +208,10 @@ rpc.exports = {
     },
     stopTracing() {
         tracer.exit();
+    },
+    getOrSetBaseTimestamp(ts) {
+        if (!ts) ts = Date.now() * 1000;
+        setBaseTimestamp(ts);
+        return ts;
     }
 };
