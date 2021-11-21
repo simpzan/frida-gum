@@ -85,7 +85,7 @@ class Tracer {
                 log.e('attach failed', error.toString(), JSON.stringify(fn));
             }
         });
-        log.i(`tracing ${functions.length} function addresses.`);
+        log.i(`tracing ${functions.length} native functions.`);
     }
     exit() {
         Interceptor.detachAll();
@@ -120,7 +120,7 @@ function traceJavaMethod(overloads, methodId) {
         const id = methodId++;
         const info = getMethodInfo(id, method, includeArgs);
         methods.push(info);
-        log.i("tracing", info);
+        // log.i("tracing", info);
         method.implementation = function() {
             recordTraceEvent(id, 1);
             const ret = method.apply(this, arguments);
@@ -147,6 +147,7 @@ function traceJavaMethods(groups) {
             }
         }
     }
+    log.i(`tracing ${ret.length} java methods`);
     return ret;
 }
 function updateGroups(ret, spec) {
@@ -165,14 +166,13 @@ function updateGroups(ret, spec) {
     }
 }
 function traceJava(specs) {
-    log.i('specs', specs);
+    log.i('java specs', specs);
     if (!specs.length) return [];
     let javaMethods = [];
     Java.perform(() => {
         const methods2Trace = new Map(); // structure: loader.class.method.id
         for (const spec of specs) updateGroups(methods2Trace, spec);
         javaMethods = traceJavaMethods(methods2Trace);
-        log.i('java functions', javaMethods.length);
     });
     return javaMethods;
 }
