@@ -155,7 +155,7 @@ async function getFunctionsToTrace(rpc, modules) {
         if (rule.src) fns = fns.filter(fn => fn.file.startsWith(rule.src));
         if (rule.function) fns = fns.filter(fn => fn.name.startsWith(rule.function));
         // fns.forEach(fn => log.i(fn.name));
-        fns = fns.filter(fn => fn.size > 4);
+        fns = fns.filter(fn => fn.size > 14);
         fns.forEach(fn => fn.cat = lib);
         log.i(`collected ${fns.length} functions from ${lib}`);
         for (const fn of fns) functions[fn.addr] = fn;
