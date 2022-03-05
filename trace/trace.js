@@ -77,6 +77,7 @@ function writeChromeTracingFile(filename, functionMap) {
         traceFile.writeObject(entry);
     }
     traceFile.close();
+    utils.runCmd(`zip -r ${filename}.zip ${filename}`);
 }
 
 function validateFunctions(functionsLocal, functionsRemote) {
