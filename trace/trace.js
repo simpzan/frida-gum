@@ -60,6 +60,12 @@ function onMessageFromDebuggee(msg, bytes) {
 }
 
 function writeChromeTracingFile(filename, functionMap) {
+    if (!events.length) return log.i('no trace data.');
+    events.sort((e1, e2) => {
+        const ret = e1.ts - e2.ts;
+        if (ret) return ret;
+        return e2.dur - e1.dur;
+    });
     log.i(`writing chrome tracing file ${filename}`);
     const traceFile = new utils.ChromeTracingFile(filename);
     for (const trace of events) {
@@ -288,8 +294,6 @@ async function main() {
     for (const process of Object.values(traceProcesses)) {
         await process.script.stopTracing();
     }
-
-    if (!events.length) return log.i('no trace data.');
 
     writeChromeTracingFile(`${deviceId}.json`, allFunctionsTracedByPid);
     log.i('tracing done!');
