@@ -20,25 +20,17 @@ class StackTrace {
         this.pid = pid;
         this.tid = tid;
         this.frames = [];
-        this.completeEvents = [];
     }
     addEvent(begin, addr, ts) {
-        if (begin) {
-            this.flush();
-            return this.frames.push({ addr, ts });
-        }
+        if (begin) return this.frames.push({ addr, ts });
 
         const e = this.frames.pop();
         if (!e) return log.e('end-only event', addr, ts);
 
         const duration = ts - e.ts;
-        this.completeEvents.push({ pid:this.pid, tid:this.tid, ph:'X', addr:e.addr, ts:e.ts, dur:duration });
-    }
-    flush() {
-        while (this.completeEvents.length) events.push(this.completeEvents.pop());
+        events.push({ pid:this.pid, tid:this.tid, ph:'X', addr:e.addr, ts:e.ts, dur:duration });
     }
     finish(threadName) {
-        this.flush();
         if (this.frames.length) log.e('begin-only events', this.frames);
 
         const threadInfo = { threadName, pid:this.pid, tid:this.tid };
@@ -68,7 +60,6 @@ function onMessageFromDebuggee(msg, bytes) {
 }
 
 function writeChromeTracingFile(filename, functionMap) {
-    if (!events.length) return log.i('no trace data.');
     log.i(`writing chrome tracing file ${filename}`);
     const traceFile = new utils.ChromeTracingFile(filename);
     for (const trace of events) {
@@ -297,6 +288,9 @@ async function main() {
     for (const process of Object.values(traceProcesses)) {
         await process.script.stopTracing();
     }
+
+    if (!events.length) return log.i('no trace data.');
+
     writeChromeTracingFile(`${deviceId}.json`, allFunctionsTracedByPid);
     log.i('tracing done!');
 };
