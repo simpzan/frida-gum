@@ -104,6 +104,7 @@ class ChromeTracingFile {
         this.sink.write("[\n");
     }
     writeObject(obj) {
+        if (!obj) return;
         this.sink.write(JSON.stringify(obj));
         this.sink.write(",\n");
     }

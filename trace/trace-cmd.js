@@ -1,40 +1,11 @@
+const utils = require('./utils.js');
 const fs = require('fs');
 const readline = require('readline');
 const log = console.log.bind(console);
 
-class ChromeTracingFile {
-    constructor(filename) {
-        this.sink = fs.createWriteStream(filename);
-        this.sink.write("[\n");
-    }
-    writeObject(obj) {
-        if (!obj) return;
-        this.sink.write(JSON.stringify(obj));
-        this.sink.write(",\n");
-    }
-    close() {
-        this.sink.write("{}]\n");
-        this.sink.end();
-    }
-}
-
-function runCmd(cmd) {
-    try {
-        console.info(`cmd: ${cmd}`);
-        const cp = require("child_process");
-        const output = cp.execSync(cmd);
-        const result = output.toString("utf8");
-        console.info(`result:\n${result}`);
-        return result.trim();
-    } catch (err) {
-        console.error(err);
-        return null;
-    }
-}
-
 function getFunctionMaps() {
-    // runCmd('trace-cmd report -tR | grep trace-cmd-8500 > ./trace.txt');
-    runCmd('trace-cmd report -f > ./fns.txt');
+    // utils.runCmd('trace-cmd report -tR | grep trace-cmd-8500 > ./trace.txt');
+    utils.runCmd('trace-cmd report -f > ./fns.txt');
     const out = fs.readFileSync('./fns.txt', 'utf8');
     const functions = {};
     out.split('\n').forEach(line => {
@@ -81,7 +52,7 @@ async function processLineByLine(file) {
   const re = /\s*(.+)-(\d+) +\[\d{3}\] (.+): funcgraph_(.+): *func=0x(\w+) /
   const stacktraceByTid = {};
   const functions = getFunctionMaps();
-  const ctf = new ChromeTracingFile("./t.json");
+  const ctf = new utils.ChromeTracingFile("./t.json");
   for await (const line of rl) {
     //   log(line)
     const m = re.exec(line);
@@ -114,7 +85,7 @@ async function processLineByLine(file) {
 }
 
 function getTidMaps() {
-    const psOut = runCmd('ps -AT -o pid,tid,comm');
+    const psOut = utils.runCmd('ps -AT -o pid,tid,comm');
     const commandByTid = {};
     psOut.split('\n').forEach(line => {
         const parts = line.split(' ').filter(p => p && p.length);
@@ -130,9 +101,8 @@ function getTidMaps() {
 
 async function main() {
     getTidMaps();
-    return;
     const file = './trace.txt';
     await processLineByLine(file);
-    runCmd('zip -r t.zip t.json');
+    utils.runCmd('zip -r t.zip t.json');
 }
 main();
