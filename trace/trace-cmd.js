@@ -113,7 +113,24 @@ async function processLineByLine(file) {
   ctf.close();
 }
 
+function getTidMaps() {
+    const psOut = runCmd('ps -AT -o pid,tid,comm');
+    const commandByTid = {};
+    psOut.split('\n').forEach(line => {
+        const parts = line.split(' ').filter(p => p && p.length);
+        const pid = parseInt(parts[0], 10);
+        if (!pid) return;
+        const tid = parseInt(parts[1], 10);
+        const comm = parts.slice(2).join(' ');
+        commandByTid[tid] = { pid, tid, comm };
+    });
+    log(commandByTid);
+    return commandByTid;
+}
+
 async function main() {
+    getTidMaps();
+    return;
     const file = './trace.txt';
     await processLineByLine(file);
     runCmd('zip -r t.zip t.json');
