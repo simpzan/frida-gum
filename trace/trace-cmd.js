@@ -103,6 +103,13 @@ async function processLineByLine(file) {
     const event = stacktrace.addEvent(ts, fn[1], phase==='entry');
     ctf.writeObject(event);
   }
+  for (const stack of Object.values(stacktraceByTid)) {
+    const pid = stack.tid;
+    const tid = pid;
+    const name = stack.tname;
+    const entry = {"ts":0, "ph":"M", "name":"thread_name", pid, tid, "args":{name}};
+    ctf.writeObject(entry);
+  }
   ctf.close();
 }
 
