@@ -1,6 +1,5 @@
 const utils = require('./utils.js');
 const fs = require('fs');
-const readline = require('readline');
 const log = console.log.bind(console);
 
 function getFunctionMaps() {
@@ -42,18 +41,13 @@ class Stacktrace {
     }
 }
 
-
 async function processLineByLine(file) {
-  const fileStream = fs.createReadStream(file);
-  const rl = readline.createInterface({
-    input: fileStream,
-    crlfDelay: Infinity
-  });
   const re = /\s*(.+)-(\d+) +\[\d{3}\] (.+): funcgraph_(.+): *func=0x(\w+) /
   const stacktraceByTid = {};
   const functions = getFunctionMaps();
   const ctf = new utils.ChromeTracingFile("./t.json");
-  for await (const line of rl) {
+  const fileStream = utils.createFileStream(file)
+  for await (const line of fileStream) {
     //   log(line)
     const m = re.exec(line);
     if (!m) {

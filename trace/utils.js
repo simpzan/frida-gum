@@ -115,6 +115,17 @@ class ChromeTracingFile {
 }
 module.exports.ChromeTracingFile = ChromeTracingFile;
 
+const readline = require('readline');
+function createFileStream(filename) {
+    const fileStream = fs.createReadStream(filename);
+    const rl = readline.createInterface({
+      input: fileStream,
+      crlfDelay: Infinity
+    });
+    return rl;
+}
+module.exports.createFileStream = createFileStream;
+
 function testInteractively() {
     const names = getThreadNames(709, [709, 751, 856, 1862]);
     log(names);
