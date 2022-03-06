@@ -45,7 +45,7 @@ async function processLineByLine(file) {
   const re = /\s*(.+)-(\d+) +\[\d{3}\] (.+): funcgraph_(.+): *func=0x(\w+) /
   const stacktraceByTid = {};
   const functions = getFunctionMaps();
-  const ctf = new utils.ChromeTracingFile("./t.json");
+  const events = [];
   const fileStream = utils.createFileStream(file)
   for await (const line of fileStream) {
     //   log(line)
@@ -66,8 +66,15 @@ async function processLineByLine(file) {
         continue;
     }
     const event = stacktrace.addEvent(ts, fn[1], phase==='entry');
-    ctf.writeObject(event);
+    if (event) events.push(event);
   }
+  events.sort((e1, e2) => {
+    const ret = e1.ts - e2.ts;
+    if (ret) return ret;
+    return e2.dur - e1.dur;
+  });
+  const ctf = new utils.ChromeTracingFile("./t.json");
+  for (const event of events) ctf.writeObject(event);
   for (const stack of Object.values(stacktraceByTid)) {
     const pid = stack.tid;
     const tid = pid;
