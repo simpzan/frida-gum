@@ -30,8 +30,14 @@ class StackTrace {
         const duration = ts - e.ts;
         events.push({ pid:this.pid, tid:this.tid, ph:'X', addr:e.addr, ts:e.ts, dur:duration });
     }
-    finish(threadName) {
+    handleBeginOnlyEvents() {
         if (this.frames.length) log.e('begin-only events', this.frames);
+        for (const e of this.frames) {
+            events.push({ pid:this.pid, tid:this.tid, ph:'B', addr:e.addr, ts:e.ts });
+        }
+    }
+    finish(threadName) {
+        this.handleBeginOnlyEvents();
 
         const threadInfo = { threadName, pid:this.pid, tid:this.tid };
         threadNames.set(this.tid, threadInfo);
