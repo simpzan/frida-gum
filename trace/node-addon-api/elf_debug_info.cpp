@@ -137,8 +137,12 @@ string decl_file(const dwarf::die &die) {
     if (decl_file == 0) return "";
 
     auto lt = cu.get_line_table();
-    auto file = lt.get_file(decl_file);
-    return file->path;
+    try {
+      auto file = lt.get_file(decl_file);
+      return file->path;
+    } catch (std::exception& e) {
+      LOGE("%s", e.what());
+    }
   }
 
   if (die.has(DW_AT::artificial) && die[DW_AT::artificial].as_flag()) {
