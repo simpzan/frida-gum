@@ -155,7 +155,37 @@ extern "C" void flushAll() {
   std::unique_lock<std::mutex> lock(buffersMutex);
   for (auto buf: buffers) buf->flushAll();
 }
+
+void installSignalHandler(void (*handler)(int,siginfo_t *,void *)) {
+  struct sigaction action;
+  action.sa_flags = SA_SIGINFO;
+  action.sa_sigaction = handler;
+
+  if (sigaction(SIGFPE, &action, NULL) == -1) {
+    ERROR("sigaction(sigfpe)");
+    _exit(1);
+  }
+  if (sigaction(SIGSEGV, &action, NULL) == -1) {
+    ERROR("sigaction(sigsegv)");
+    _exit(1);
+  }
+  if (sigaction(SIGILL, &action, NULL) == -1) {
+    ERROR("sigaction(sigill)");
+    _exit(1);
+  }
+  if (sigaction(SIGBUS, &action, NULL) == -1) {
+    ERROR("sigaction(sigbus)");
+    _exit(1);
+  }
+}
+void onSignal(int signo, siginfo_t *info, void *extra) {
+  flushAll();
+  ERROR("Signal %d received", signo);
+  ::abort();
+}
+
 __attribute__((constructor)) void init (void) {
+  installSignalHandler(onSignal);
   baseTimestamp = g_get_real_time();
   INFO ("init %f", baseTimestamp/1000000.0);
 }
