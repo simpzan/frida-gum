@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
+#include <libgen.h>
 
 static inline int getTimeString(char *buffer, int length) {
     time_t timer;
@@ -30,7 +31,8 @@ static inline uint64_t gettid() {
 #define LOG_PRINT(level, format, args...) do { \
     char buffer[16] = {0}; getTimeString(buffer, 16); \
     printf("%s %s %d:%u %s:%d:%s " format "\n", buffer, level, getpid(), \
-        (uint32_t)gettid(), basename(__FILE__), __LINE__, __FUNCTION__, ##args); \
+        (uint32_t)gettid(), basename((char *)__FILE__), __LINE__, __FUNCTION__, \
+        ##args); \
 } while (0)
 #define ERRNO(format, args...) LOG_PRINT("E", format ", errno %d %s", \
     ##args, errno, strerror(errno))
