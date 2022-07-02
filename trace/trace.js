@@ -141,7 +141,7 @@ class Module {
                 log.w('no debug info', fn);
                 continue;
             }
-            fn.file = info.src;
+            fn.file = path.normalize(info.src);
             fn.line = info.line;
             fn.addr = fn.address + baseAddr;
             ret.push(fn);
